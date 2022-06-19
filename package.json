@@ -9,13 +9,17 @@
     "build:node": "wasm-pack build --target nodejs -d pkg/node --out-name scrapbox-parser-core-node",
     "build:core": "wasm-pack build --target bundler -d pkg/bundler",
     "preview": "vite preview",
-    "test": "vitest"
+    "test": "vitest",
+    "prepare": "husky install"
   },
   "devDependencies": {
     "@types/react": "^18.0.0",
     "@types/react-dom": "^18.0.0",
     "@vitejs/plugin-react": "^1.3.0",
+    "husky": "^8.0.1",
     "jsdom": "^19.0.0",
+    "lint-staged": "^13.0.2",
+    "prettier": "2.7.1",
     "typescript": "^4.5.4",
     "vite": "^2.9.9",
     "vitest": "^0.15.1"
@@ -24,5 +28,8 @@
     "react": "^18.0.0",
     "react-dom": "^18.0.0",
     "scrapbox-parser-core": "file:pkg/web"
+  },
+  "lint-staged": {
+    "**/*": "prettier --write --ignore-unknown"
   }
 }
