@@ -1,8 +1,6 @@
-import init, { hex_color_js } from "scrapbox-parser-core";
+import init, { scrapbox_to_markdown } from "scrapbox-parser-core";
 
-const main = async () => {
+export const scrapboxToMarkdown = async (input: string): Promise<string> => {
   await init();
-  console.log(hex_color_js("#2F14DF"));
+  return scrapbox_to_markdown(input);
 };
-
-main();

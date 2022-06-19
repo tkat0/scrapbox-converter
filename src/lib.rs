@@ -38,6 +38,11 @@ pub fn hex_color_js(input: &str) -> String {
     format!("{:?}", color)
 }
 
+#[wasm_bindgen]
+pub fn scrapbox_to_markdown(input: &str) -> String {
+    input.to_string()
+}
+
 // Import the `window.alert` function from the Web.
 #[wasm_bindgen]
 extern "C" {
