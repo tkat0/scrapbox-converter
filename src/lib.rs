@@ -6,6 +6,10 @@ use nom::{
 };
 use wasm_bindgen::prelude::*;
 
+mod ast;
+mod parser;
+mod visitor;
+
 #[derive(Debug, PartialEq)]
 pub struct Color {
     pub red: u8,
