@@ -87,6 +87,7 @@ impl ExternalLink {
 }
 
 mod test {
+    #[warn(unused_imports)]
     use super::*;
 
     #[test]

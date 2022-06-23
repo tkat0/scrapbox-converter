@@ -21,9 +21,9 @@ pub trait Visitor {
         }
     }
 
-    fn visit_hashtag(&mut self, hashtag: &HashTag) {}
-    fn visit_brachet(&mut self, bracket: &Bracket) {}
-    fn visit_text(&mut self, text: &Text) {}
+    fn visit_hashtag(&mut self, _hashtag: &HashTag) {}
+    fn visit_brachet(&mut self, _bracket: &Bracket) {}
+    fn visit_text(&mut self, _text: &Text) {}
 }
 
 pub struct CodeGen {}
@@ -54,6 +54,7 @@ impl Visitor for CodeGen {
 }
 
 mod test {
+    #[warn(unused_imports)]
     use super::*;
 
     #[test]

@@ -1,21 +1,17 @@
 use std::convert::identity;
 
-use nom::character::complete::{char, line_ending};
-use nom::combinator::{eof, opt, peek, value};
+use nom::character::complete::char;
+use nom::combinator::{opt, peek};
 use nom::error::{ParseError, VerboseError};
+use nom::IResult;
 use nom::{
     branch::alt,
-    bytes::complete::{tag, take_till, take_until, take_while, take_while_m_n},
-    character::{
-        complete::{anychar, newline, none_of, space1},
-        is_newline,
-    },
-    combinator::{map, map_res},
-    multi::{fold_many0, many0},
-    sequence::{delimited, preceded, terminated, tuple},
-    Err, Parser,
+    bytes::complete::{tag, take_until, take_while},
+    combinator::map,
+    multi::many0,
+    sequence::{delimited, preceded},
+    Err,
 };
-use nom::{IResult, Needed};
 
 use crate::ast::*;
 
@@ -150,9 +146,9 @@ fn internal_link(input: &str) -> Result<&str, InternalLink> {
     Ok((input, InternalLink::new(text)))
 }
 
-/// https://google.com or [https://google.com] or [https://google.com Google] or [Google https://google.com]
+/// https://www.rust-lang.org/ or [https://www.rust-lang.org/] or [https://www.rust-lang.org/ Rust] or [Rust https://www.rust-lang.org/]
 fn external_link(input: &str) -> Result<&str, ExternalLink> {
-    // [https://google.com]
+    // [https://www.rust-lang.org/]
     fn url(input: &str) -> Result<&str, ExternalLink> {
         let (input, protocol) = alt((tag("https://"), tag("http://")))(input)?;
         let (input, url) = take_until("]")(input)?;
@@ -163,7 +159,7 @@ fn external_link(input: &str) -> Result<&str, ExternalLink> {
         ))
     }
 
-    // [https://google.com Google]
+    // [https://www.rust-lang.org/ Rust]
     fn url_title(input: &str) -> Result<&str, ExternalLink> {
         let (input, protocol) = alt((tag("https://"), tag("http://")))(input)?;
         let (input, url) = take_until(" ")(input)?;
@@ -176,7 +172,7 @@ fn external_link(input: &str) -> Result<&str, ExternalLink> {
         ))
     }
 
-    // [Google https://google.com]
+    // [Rust https://www.rust-lang.org/]
     fn title_url(input: &str) -> Result<&str, ExternalLink> {
         let (input, title) = take_until(" ")(input)?;
         let (input, _) = char(' ')(input)?;
@@ -236,6 +232,7 @@ fn helpfeel() {}
 fn bullet_points() {}
 
 mod test {
+    #[warn(unused_imports)]
     use super::*;
 
     #[test]
@@ -279,20 +276,26 @@ mod test {
     #[test]
     fn external_link_test() {
         assert_eq!(
-            external_link("[https://google.com]"),
-            Ok(("", ExternalLink::new(None, "https://google.com")))
+            external_link("[https://www.rust-lang.org/]"),
+            Ok(("", ExternalLink::new(None, "https://www.rust-lang.org/")))
         );
         assert_eq!(
-            external_link("[Google https://google.com]"),
-            Ok(("", ExternalLink::new(Some("Google"), "https://google.com")))
+            external_link("[Rust https://www.rust-lang.org/]"),
+            Ok((
+                "",
+                ExternalLink::new(Some("Rust"), "https://www.rust-lang.org/")
+            ))
         );
         assert_eq!(
-            external_link("[https://google.com Google]"),
-            Ok(("", ExternalLink::new(Some("Google"), "https://google.com")))
+            external_link("[https://www.rust-lang.org/ Rust]"),
+            Ok((
+                "",
+                ExternalLink::new(Some("Rust"), "https://www.rust-lang.org/")
+            ))
         );
         // assert_eq!(
-        //     external_link("https://google.com"),
-        //     Ok(("", ExternalLink::new(None, "https://google.com]")))
+        //     external_link("https://www.rust-lang.org/"),
+        //     Ok(("", ExternalLink::new(None, "https://www.rust-lang.org/]")))
         // );
     }
 
@@ -308,11 +311,14 @@ mod test {
             ))
         );
         assert_eq!(
-            bracketing("[https://google.com]"),
+            bracketing("[https://www.rust-lang.org/]"),
             Ok((
                 "",
                 Bracket {
-                    kind: BracketKind::ExternalLink(ExternalLink::new(None, "https://google.com"))
+                    kind: BracketKind::ExternalLink(ExternalLink::new(
+                        None,
+                        "https://www.rust-lang.org/"
+                    ))
                 }
             ))
         );
@@ -398,7 +404,7 @@ mod test {
 
     #[test]
     fn page_test() {
-        let actual = page("abc\n#efg [internal link][https://google.com]\n");
+        let actual = page("abc\n#efg [internal link][https://www.rust-lang.org/]\n");
         let expected = Page {
             lines: vec![
                 Line {
@@ -429,7 +435,7 @@ mod test {
                             kind: SyntaxKind::Bracket(Bracket {
                                 kind: BracketKind::ExternalLink(ExternalLink::new(
                                     None,
-                                    "https://google.com",
+                                    "https://www.rust-lang.org/",
                                 )),
                             }),
                         },
