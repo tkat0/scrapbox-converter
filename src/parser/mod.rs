@@ -17,7 +17,7 @@ use crate::ast::*;
 
 pub type Result<I, O, E = VerboseError<I>> = IResult<I, O, E>;
 
-fn page(input: &str) -> Result<&str, Page> {
+pub fn page(input: &str) -> Result<&str, Page> {
     let (input, lines) = many0(line)(input)?;
 
     Ok((input, Page { lines }))

@@ -42,7 +42,7 @@ pub struct Bracket {
 pub enum BracketKind {
     InternalLink(InternalLink),
     ExternalLink(ExternalLink),
-    Decoration,
+    Decoration(Decoration),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -86,12 +86,25 @@ impl ExternalLink {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct Decoration {
+    pub text: String,
+}
+
+impl Decoration {
+    pub fn new(text: &str) -> Self {
+        Self {
+            text: text.to_string(),
+        }
+    }
+}
+
 mod test {
     #[warn(unused_imports)]
     use super::*;
 
     #[test]
-    fn aaa() {
+    fn ast_test() {
         let page = Page {
             lines: vec![Line {
                 items: vec![
@@ -112,10 +125,10 @@ mod test {
                     },
                     Syntax {
                         kind: SyntaxKind::Bracket(Bracket {
-                            kind: BracketKind::ExternalLink(ExternalLink {
-                                title: None,
-                                url: "https://www.rust-lang.org/".to_string(),
-                            }),
+                            kind: BracketKind::ExternalLink(ExternalLink::new(
+                                Some("Rust"),
+                                "https://www.rust-lang.org/",
+                            )),
                         }),
                     },
                 ],

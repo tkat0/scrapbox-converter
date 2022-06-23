@@ -9,7 +9,7 @@
   ],
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "npm run build:core && tsc && vite build",
     "build:core": "wasm-pack build --target web -d pkg",
     "preview": "vite preview",
     "test": "vitest",

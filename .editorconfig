@@ -10,6 +10,6 @@ indent_size = 4
 [Makefile]
 indent_style = tab
 
-[*.{js,ts,jsx,tsx,json}]
+[*.{js,ts,jsx,tsx,json,yml}]
 indent_style = space
 indent_size = 2
