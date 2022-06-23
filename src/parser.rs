@@ -1,8 +1,8 @@
 use std::convert::identity;
 
 use nom::character::complete::{char, line_ending};
-use nom::combinator::{eof, opt, peek};
-use nom::error::{Error, ParseError, VerboseError};
+use nom::combinator::{eof, opt, peek, value};
+use nom::error::{ParseError, VerboseError};
 use nom::{
     branch::alt,
     bytes::complete::{tag, take_till, take_until, take_while, take_while_m_n},
@@ -13,21 +13,14 @@ use nom::{
     combinator::{map, map_res},
     multi::{fold_many0, many0},
     sequence::{delimited, preceded, terminated, tuple},
-    Parser,
+    Err, Parser,
 };
-use nom::{error_position, IResult};
+use nom::{IResult, Needed};
 
 use crate::ast::*;
 
 pub type Result<I, O, E = VerboseError<I>> = IResult<I, O, E>;
 
-fn sp(input: &str) -> Result<&str, &str> {
-    let chars = "\t[#\n";
-
-    take_while(move |c| chars.contains(c))(input)
-}
-
-// fn page<'a, E: ParseError<&'a str>>(input: &'a str) -> Result<&'a str, Page, E> {
 fn page(input: &str) -> Result<&str, Page> {
     let (input, lines) = many0(line)(input)?;
 
@@ -35,21 +28,17 @@ fn page(input: &str) -> Result<&str, Page> {
 }
 
 fn line(input: &str) -> Result<&str, Line> {
+    if input.is_empty() {
+        return Err(Err::Error(VerboseError::from_char(input, ' ')));
+    }
+    // skip '\n' if it is at the beginning of the line.
+    let (input, _) = opt(char('\n'))(input)?;
     map(many0(syntax), |c| Line {
         items: c.into_iter().filter_map(identity).collect(),
     })(input)
 }
 
 fn syntax(input: &str) -> Result<&str, Option<Syntax>> {
-    dbg!(input);
-
-    // let (input, _) = opt(char('\n'))(input)?;
-    // dbg!(input);
-
-    // if input.is_empty() {
-    //     return Ok(("", None));
-    // }
-
     map(
         alt((
             map(hashtag, |s| Syntax {
@@ -69,16 +58,14 @@ fn syntax(input: &str) -> Result<&str, Option<Syntax>> {
 /// #tag
 fn hashtag(input: &str) -> Result<&str, HashTag> {
     let terminators = vec![" ", "　", "\n"];
+
+    // TODO(tkat0): "#[tag]" -> Error
+    //  it should be handled with text + internal link
+
     map(
         preceded(
             tag("#"),
             take_while(move |c: char| !terminators.contains(&c.to_string().as_str())),
-            // alt((
-            //     take_until(" "),
-            //     take_until("　"), // zenkaku space
-            //     take_until("\n"),
-            //     take_while(|_| true), // eol
-            // )),
         ),
         |s: &str| HashTag {
             value: s.to_string(),
@@ -86,18 +73,13 @@ fn hashtag(input: &str) -> Result<&str, HashTag> {
     )(input)
 }
 
-// only consume \n
-/// "xxx #tag" -> "xxx"
 fn text(input: &str) -> Result<&str, Text> {
     if input.is_empty() {
-        // return Err(nom::Err::Error(error_position!(
-        //     input,
-        //     nom::error::ErrorKind::Alpha
-        // )));
-        return Err(nom::Err::Error(error_position!(
-            input,
-            nom::error::ErrorKind::Alpha
-        )));
+        return Err(Err::Error(VerboseError::from_char(input, 'x')));
+    }
+
+    if input.starts_with("#") {
+        return Err(Err::Error(VerboseError::from_char(input, ' ')));
     }
 
     // "abc #tag" -> ("#tag", "abc ")
@@ -111,30 +93,43 @@ fn text(input: &str) -> Result<&str, Text> {
     // "abc \n" -> ("", "abc ")
     fn take_until_newline(input: &str) -> Result<&str, &str> {
         let (input, text) = take_until("\n")(input)?;
-        let (input, _) = char('\n')(input)?;
+        // let (input, _) = char('\n')(input)?;
         Ok((input, text))
     }
 
-    let chars = "[#\n";
-    map(
-        alt((
-            take_until_tag,
-            take_while(|c| c != '['),
-            take_until_newline,
-            // take_while(move |c| !chars.contains(c)),
-        )),
-        // take_while(|c| c != '[' || c != '#' || c != '\n'),
-        |s: &str| Text {
-            value: s.to_string(),
-        },
-    )(input)
-}
+    fn take_until_bracket(input: &str) -> Result<&str, &str> {
+        take_while(|c| c != '[')(input)
+    }
 
-fn anystring(input: &str) -> Result<&str, String> {
-    fold_many0(anychar, String::new, |mut string, c| {
-        string.push(c);
-        string
-    })(input)
+    // shortest match to avoid overeating
+    // TODO(tkat0): refactor
+    let ret = vec![
+        peek(take_until_tag)(input),
+        peek(take_until_bracket)(input),
+        peek(take_until_newline)(input),
+    ];
+
+    let ret = ret
+        .iter()
+        .filter(|r| r.is_ok())
+        .filter_map(|x| x.as_ref().ok())
+        .min_by(|(_, a), (_, b)| a.len().cmp(&b.len()));
+
+    match ret {
+        Some(&(input, consumed)) => {
+            if consumed.is_empty() {
+                return Err(Err::Error(VerboseError::from_char(input, ' ')));
+            }
+            let input = input.split_at(consumed.len()).1;
+            let text = Text {
+                value: consumed.to_string(),
+            };
+            return Ok((input, text));
+        }
+        None => {
+            return Err(Err::Error(VerboseError::from_char(input, ' ')));
+        }
+    }
 }
 
 /// []
@@ -150,8 +145,6 @@ fn bracketing(input: &str) -> Result<&str, Bracket> {
 }
 
 // [internal link]
-// fn internal_link<'a, E: ParseError<&'a str>>(input: &'a str) -> Result<&'a str, InternalLink, E> {
-// fn internal_link<'a>(input: &'a str) -> Result<&'a str, InternalLink, VerboseError<&'a str>> {
 fn internal_link(input: &str) -> Result<&str, InternalLink> {
     let (input, text) = delimited(char('['), take_while(|c| c != ']'), char(']'))(input)?;
     Ok((input, InternalLink::new(text)))
@@ -243,8 +236,6 @@ fn helpfeel() {}
 fn bullet_points() {}
 
 mod test {
-    use nom::error::{Error, ErrorKind};
-
     use super::*;
 
     #[test]
@@ -253,15 +244,25 @@ mod test {
         assert_eq!(hashtag("#tag\n"), Ok(("\n", HashTag::new("tag"))));
         assert_eq!(hashtag("#tag "), Ok((" ", HashTag::new("tag"))));
         assert_eq!(hashtag("#tag　"), Ok(("　", HashTag::new("tag"))));
+        assert_eq!(hashtag("####tag"), Ok(("", HashTag::new("###tag"))));
+        assert_eq!(hashtag("#[tag"), Ok(("", HashTag::new("[tag"))));
+        // assert!(hashtag("#[tag]").is_err());
+        // assert!(hashtag("# tag").is_err());
     }
 
     #[test]
     fn text_test() {
-        assert!(text("[* bold]").is_err());
         assert!(text("").is_err());
-        // assert_eq!(text("[* bold]"), Ok(("", Text::new("[* bold]"))));
-        assert_eq!(text("#tag"), Ok(("", Text::new("#tag")))); // TODO(tkat0): consider this spec.
+        assert!(text("[* bold]").is_err());
+        assert!(text("#tag").is_err());
+        assert_eq!(text(" #tag"), Ok(("#tag", Text::new(" "))));
+        assert_eq!(text(" [url]"), Ok(("[url]", Text::new(" "))));
+        assert_eq!(text(" #tag["), Ok(("#tag[", Text::new(" "))));
+        assert_eq!(text(" [#tag"), Ok(("[#tag", Text::new(" "))));
+        assert_eq!(text(" [ #tag"), Ok(("[ #tag", Text::new(" "))));
+        assert_eq!(text(" \n"), Ok(("\n", Text::new(" "))));
         assert_eq!(text("abc#tag"), Ok(("", Text::new("abc#tag"))));
+        assert_eq!(text("abc #tag"), Ok(("#tag", Text::new("abc "))));
         assert_eq!(text(" #tag"), Ok(("#tag", Text::new(" "))));
         assert_eq!(text("abc"), Ok(("", Text::new("abc"))));
         assert_eq!(text("あいう"), Ok(("", Text::new("あいう"))));
@@ -319,20 +320,30 @@ mod test {
 
     #[test]
     fn syntax_test() {
-        assert_eq!(syntax(""), Ok(("", None)));
+        assert!(syntax("").is_err());
+        assert!(syntax("\n").is_err());
         assert_eq!(
-            syntax("#tag"),
+            syntax("abc #tag "),
             Ok((
-                "",
+                "#tag ",
+                Some(Syntax {
+                    kind: SyntaxKind::Text(Text::new("abc "))
+                })
+            ))
+        );
+        assert_eq!(
+            syntax("#tag abc"),
+            Ok((
+                " abc",
                 Some(Syntax {
                     kind: SyntaxKind::HashTag(HashTag::new("tag"))
                 })
             ))
         );
         assert_eq!(
-            syntax("[title]"),
+            syntax("[title]abc"),
             Ok((
-                "",
+                "abc",
                 Some(Syntax {
                     kind: SyntaxKind::Bracket(Bracket {
                         kind: BracketKind::InternalLink(InternalLink::new("title"))
@@ -340,50 +351,54 @@ mod test {
                 })
             ))
         );
-        // assert_eq!(syntax("[* bold]"), Ok(("[* bold]", Text::new(""))));
-        // assert_eq!(syntax("abc"), Ok(("", Text::new("abc"))));
-        // assert_eq!(syntax("あいう"), Ok(("", Text::new("あいう"))));
     }
 
     #[test]
     fn line_test() {
-        many0(syntax)("x").unwrap();
-
-        // assert_eq!(
-        //     line(" "),
-        //     Ok((
-        //         "",
-        //         Line {
-        //             items: vec![Syntax {
-        //                 kind: SyntaxKind::Text(Text::new(" "))
-        //             },],
-        //         }
-        //     ))
-        // );
-        // assert_eq!(
-        //     line("#tag #tag\n"),
-        //     Ok((
-        //         "",
-        //         Line {
-        //             items: vec![
-        //                 Syntax {
-        //                     kind: SyntaxKind::HashTag(HashTag::new("tag"))
-        //                 },
-        //                 Syntax {
-        //                     kind: SyntaxKind::Text(Text::new(" "))
-        //                 },
-        //                 Syntax {
-        //                     kind: SyntaxKind::HashTag(HashTag::new("tag"))
-        //                 },
-        //             ],
-        //         }
-        //     ))
-        // );
+        assert!(line("").is_err());
+        assert_eq!(
+            line(" "),
+            Ok((
+                "",
+                Line {
+                    items: vec![Syntax {
+                        kind: SyntaxKind::Text(Text::new(" "))
+                    },],
+                }
+            ))
+        );
+        assert_eq!(
+            line("#tag #tag [internal link]\n"),
+            Ok((
+                "\n",
+                Line {
+                    items: vec![
+                        Syntax {
+                            kind: SyntaxKind::HashTag(HashTag::new("tag"))
+                        },
+                        Syntax {
+                            kind: SyntaxKind::Text(Text::new(" "))
+                        },
+                        Syntax {
+                            kind: SyntaxKind::HashTag(HashTag::new("tag"))
+                        },
+                        Syntax {
+                            kind: SyntaxKind::Text(Text::new(" "))
+                        },
+                        Syntax {
+                            kind: SyntaxKind::Bracket(Bracket {
+                                kind: BracketKind::InternalLink(InternalLink::new("internal link"))
+                            })
+                        },
+                    ],
+                }
+            ))
+        );
     }
 
     #[test]
     fn page_test() {
-        let actual = page("abc\n#efg [internal link]\n");
+        let actual = page("abc\n#efg [internal link][https://google.com]\n");
         let expected = Page {
             lines: vec![
                 Line {
@@ -410,8 +425,17 @@ mod test {
                                 kind: BracketKind::InternalLink(InternalLink::new("internal link")),
                             }),
                         },
+                        Syntax {
+                            kind: SyntaxKind::Bracket(Bracket {
+                                kind: BracketKind::ExternalLink(ExternalLink::new(
+                                    None,
+                                    "https://google.com",
+                                )),
+                            }),
+                        },
                     ],
                 },
+                Line { items: vec![] },
             ],
         };
         assert_eq!(actual, Ok(("", expected)))

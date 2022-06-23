@@ -1,26 +1,26 @@
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Page {
     pub lines: Vec<Line>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Line {
     pub items: Vec<Syntax>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Syntax {
     pub kind: SyntaxKind,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum SyntaxKind {
     HashTag(HashTag),
     Bracket(Bracket),
     Text(Text),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct HashTag {
     pub value: String,
 }
@@ -33,19 +33,19 @@ impl HashTag {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Bracket {
     pub kind: BracketKind,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum BracketKind {
     InternalLink(InternalLink),
     ExternalLink(ExternalLink),
     Decoration,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Text {
     pub value: String,
 }
@@ -58,7 +58,7 @@ impl Text {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct InternalLink {
     pub title: String,
 }
@@ -71,7 +71,7 @@ impl InternalLink {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ExternalLink {
     pub title: Option<String>,
     pub url: String,
