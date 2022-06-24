@@ -6,11 +6,11 @@ import tsconfigPaths from "vite-tsconfig-paths";
 module.exports = defineConfig({
   build: {
     // https://vitejs.dev/guide/build.html#library-mode
-    lib: {
-      entry: path.resolve(__dirname, "src/main.ts"),
-      name: "scrapbox-converter",
-      fileName: (format) => `scrapbox-converter.${format}.js`,
-    },
+    // lib: {
+    //   entry: path.resolve(__dirname, "src/main.ts"),
+    //   name: "scrapbox-converter",
+    //   fileName: (format) => `scrapbox-converter.${format}.js`,
+    // },
     rollupOptions: {
       external: ["react"],
       output: {
