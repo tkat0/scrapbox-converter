@@ -4,7 +4,7 @@ Scraobox To Markdown Converter
 #scrapbox #obsidian #rust #webassembly
 
 This is a hobby project to import [Scrapbox https://scrapbox.io] to [Obsidian https://obsidian.md/].
-It aims to be able to convert Scrapbox and Markdown to each other,
+It aims to be able to convert Scrapbox and Markdown to each other.
 
 Scrapbox syntax parser is written in Rust by using [nom https://github.com/Geal/nom].
 And then, It is compiled into WebAssembly and run in the browser without sending data externally.

@@ -1,6 +1,12 @@
-import init, { scrapbox_to_markdown } from "@@/scrapbox_converter_core";
+import init, {
+  scrapboxToMarkdown as scrapboxToMarkdownCore,
+} from "@@/scrapbox_converter_core";
+import { Config } from "./app/ConfigModal";
 
-export const scrapboxToMarkdown = async (input: string): Promise<string> => {
+export const scrapboxToMarkdown = async (
+  input: string,
+  config: Config
+): Promise<string> => {
   await init();
-  return scrapbox_to_markdown(input);
+  return scrapboxToMarkdownCore(input, config);
 };

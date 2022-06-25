@@ -3,6 +3,7 @@ import { ExternalLinkIcon } from "@chakra-ui/icons";
 import React, { useEffect, useState } from "react";
 
 import { scrapboxToMarkdown } from "../main";
+import { ConfigModal, defaultConfig } from "./ConfigModal";
 import { defaultData } from "./data";
 
 interface FormProps {
@@ -25,13 +26,14 @@ const Form = (props: FormProps) => {
 function App() {
   const [src, setSrc] = useState(defaultData);
   const [dst, setDst] = useState(src);
+  const [config, setConfig] = useState(defaultConfig);
 
   useEffect(() => {
     (async () => {
-      const dst = await scrapboxToMarkdown(src);
+      const dst = await scrapboxToMarkdown(src, config);
       setDst(dst);
     })();
-  }, [src]);
+  }, [src, config]);
 
   const onChange = async (event: React.ChangeEvent<HTMLTextAreaElement>) => {
     setSrc(event.target.value);
@@ -40,17 +42,26 @@ function App() {
   return (
     <Box m="8">
       <Heading mb="2">Scrapbox To Markdown Converter (alpha)</Heading>
-      <Link href="https://github.com/tkat0/scrapbox-converter" isExternal>
-        https://github.com/tkat0/scrapbox-converter{" "}
-        <ExternalLinkIcon mx="2px" />
-      </Link>
-      <Flex mt="8">
-        <Box flex="1" mr="1" ml="1">
-          <Heading size="md">Scrapbox</Heading>
+      <Box m="2">
+        <Link href="https://github.com/tkat0/scrapbox-converter" isExternal>
+          https://github.com/tkat0/scrapbox-converter{" "}
+          <ExternalLinkIcon mx="2px" />
+        </Link>
+      </Box>
+      <Box m="2">
+        <ConfigModal config={config} setConfig={setConfig} />
+      </Box>
+      <Flex>
+        <Box flex="1" m="2">
+          <Heading size="md" mb="2">
+            Scrapbox
+          </Heading>
           <Form value={src} onChange={onChange} />
         </Box>
-        <Box flex="1" mr="1" ml="1">
-          <Heading size="md">Markdown (read only)</Heading>
+        <Box flex="1" m="2">
+          <Heading size="md" mb="2">
+            Markdown (read only)
+          </Heading>
           <Form value={dst} />
         </Box>
       </Flex>
