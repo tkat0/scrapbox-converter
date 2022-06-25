@@ -6,6 +6,7 @@ on:
       - "main"
 
 env:
+  RUST_BACKTRACE: 1
   CARGO_TERM_COLOR: always
 
 jobs:
@@ -17,7 +18,15 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
+      - name: Install Rust ${{ env.rust_stable }}
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
       - uses: Swatinem/rust-cache@v1
+        with:
+          cache-on-failure: true
       - name: Build
         run: cargo build --verbose
       - name: Run tests
