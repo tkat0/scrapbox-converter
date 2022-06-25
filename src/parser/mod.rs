@@ -40,18 +40,14 @@ fn line(input: &str) -> Result<&str, Line> {
 fn syntax(input: &str) -> Result<&str, Option<Syntax>> {
     map(
         alt((
-            map(hashtag, |s| Syntax {
-                kind: SyntaxKind::HashTag(s),
+            map(hashtag, |s| Syntax::new(SyntaxKind::HashTag(s))),
+            map(bracketing, |s| Syntax::new(SyntaxKind::Bracket(s))),
+            map(external_link_plain, |s| {
+                Syntax::new(SyntaxKind::Bracket(Bracket::new(
+                    BracketKind::ExternalLink(s),
+                )))
             }),
-            map(bracketing, |s| Syntax {
-                kind: SyntaxKind::Bracket(s),
-            }),
-            map(external_link_plain, |s| Syntax {
-                kind: SyntaxKind::Bracket(Bracket::new(BracketKind::ExternalLink(s))),
-            }),
-            map(text, |s| Syntax {
-                kind: SyntaxKind::Text(s),
-            }),
+            map(text, |s| Syntax::new(SyntaxKind::Text(s))),
         )),
         Some,
     )(input)
@@ -415,29 +411,23 @@ mod test {
             syntax("abc #tag "),
             Ok((
                 "#tag ",
-                Some(Syntax {
-                    kind: SyntaxKind::Text(Text::new("abc "))
-                })
+                Some(Syntax::new(SyntaxKind::Text(Text::new("abc "))))
             ))
         );
         assert_eq!(
             syntax("#tag abc"),
             Ok((
                 " abc",
-                Some(Syntax {
-                    kind: SyntaxKind::HashTag(HashTag::new("tag"))
-                })
+                Some(Syntax::new(SyntaxKind::HashTag(HashTag::new("tag"))))
             ))
         );
         assert_eq!(
             syntax("[title]abc"),
             Ok((
                 "abc",
-                Some(Syntax {
-                    kind: SyntaxKind::Bracket(Bracket::new(BracketKind::InternalLink(
-                        InternalLink::new("title")
-                    )))
-                })
+                Some(Syntax::new(SyntaxKind::Bracket(Bracket::new(
+                    BracketKind::InternalLink(InternalLink::new("title"))
+                ))))
             ))
         );
     }

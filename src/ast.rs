@@ -187,26 +187,21 @@ mod test {
             lines: vec![Line::new(
                 LineKind::Normal,
                 vec![
-                    Syntax {
-                        kind: SyntaxKind::Text(Text {
+                    Syntax::new(SyntaxKind::Text(Text {
                             value: "abc".to_string(),
-                        }),
-                    },
-                    Syntax {
-                        kind: SyntaxKind::HashTag(HashTag {
+                    })),
+                    Syntax::new(SyntaxKind::HashTag(HashTag {
                             value: "tag".to_string(),
-                        }),
-                    },
-                    Syntax {
-                        kind: SyntaxKind::Text(Text {
+                    })),
+                    Syntax::new(SyntaxKind::Text(Text {
                             value: " ".to_string(),
-                        }),
-                    },
-                    Syntax {
-                        kind: SyntaxKind::Bracket(Bracket::new(BracketKind::ExternalLink(
-                            ExternalLink::new(Some("Rust"), "https://www.rust-lang.org/"),
+                    })),
+                    Syntax::new(SyntaxKind::Bracket(Bracket::new(
+                        BracketKind::ExternalLink(ExternalLink::new(
+                            Some("Rust"),
+                            "https://www.rust-lang.org/",
+                        )),
                         ))),
-                    },
                 ],
             )],
         };
