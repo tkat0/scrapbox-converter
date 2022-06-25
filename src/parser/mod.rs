@@ -135,7 +135,7 @@ fn bracketing(input: &str) -> Result<&str, Bracket> {
     let (input, _) = peek(delimited(char('['), take_while(|c| c != ']'), char(']')))(input)?;
     map(
         alt((
-            map(decoration, |c| BracketKind::Decoration(c)),
+            map(emphasis, |c| BracketKind::Emphasis(c)),
             map(external_link, |c| BracketKind::ExternalLink(c)),
             map(internal_link, |c| BracketKind::InternalLink(c)),
         )),
@@ -208,11 +208,11 @@ fn image() {}
 /// [/icons/todo.icon]
 fn icon() {}
 
-/// [*-/** decoration]
+/// [*-/** emphasis]
 /// [[Bold]] or [* Bold] or [*** Bold]
 /// [/ italic]
 /// [- strikethrough]
-fn decoration(input: &str) -> Result<&str, Decoration> {
+fn emphasis(input: &str) -> Result<&str, Emphasis> {
     let (input, text) = delimited(char('['), take_while(|c| c != ']'), char(']'))(input)?;
 
     let (rest, tokens) = take_while(|c| ['*', '/', '-'].contains(&c))(text)?;
@@ -230,7 +230,7 @@ fn decoration(input: &str) -> Result<&str, Decoration> {
         }
     }
 
-    Ok((input, Decoration::new(text, bold, italic, strikethrough)))
+    Ok((input, Emphasis::new(text, bold, italic, strikethrough)))
 }
 
 /// [$ Tex here]
@@ -284,14 +284,24 @@ mod test {
             decoration("[***** text]"),
             Ok(("", Decoration::bold_level("text", 5)))
         );
-        assert_eq!(decoration("[/ text]"), Ok(("", Decoration::italic("text"))));
+    #[test]
+    fn emphasis_test() {
         assert_eq!(
-            decoration("[- text]"),
-            Ok(("", Decoration::strikethrough("text")))
+            emphasis("[* text]"),
+            Ok(("", Emphasis::bold_level("text", 1)))
         );
         assert_eq!(
-            decoration("[*/*-* text]"),
-            Ok(("", Decoration::new("text", 3, 1, 1)))
+            emphasis("[***** text]"),
+            Ok(("", Emphasis::bold_level("text", 5)))
+        );
+        assert_eq!(emphasis("[/ text]"), Ok(("", Emphasis::italic("text"))));
+        assert_eq!(
+            emphasis("[- text]"),
+            Ok(("", Emphasis::strikethrough("text")))
+        );
+        assert_eq!(
+            emphasis("[*/*-* text]"),
+            Ok(("", Emphasis::new("text", 3, 1, 1)))
         );
     }
 

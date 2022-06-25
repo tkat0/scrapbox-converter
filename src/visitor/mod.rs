@@ -69,7 +69,7 @@ pub trait Visitor {
         match &bracket.kind {
             BracketKind::InternalLink(v) => self.visit_bracket_internal_link(&v),
             BracketKind::ExternalLink(v) => self.visit_bracket_external_link(&v),
-            BracketKind::Decoration(v) => self.visit_bracket_decoration(&v),
+            BracketKind::Emphasis(v) => self.visit_bracket_emphasis(&v),
             BracketKind::Heading(v) => self.visit_bracket_heading(&v),
         }
     }
@@ -82,7 +82,7 @@ pub trait Visitor {
         None
     }
 
-    fn visit_bracket_decoration(&mut self, _decoration: &Decoration) -> Option<TransformCommand> {
+    fn visit_bracket_emphasis(&mut self, _emphasis: &Emphasis) -> Option<TransformCommand> {
         None
     }
 

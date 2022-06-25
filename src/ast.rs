@@ -66,7 +66,7 @@ impl Bracket {
 pub enum BracketKind {
     InternalLink(InternalLink),
     ExternalLink(ExternalLink),
-    Decoration(Decoration),
+    Emphasis(Emphasis),
     Heading(Heading),
 }
 
@@ -127,14 +127,14 @@ impl Heading {
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
-pub struct Decoration {
+pub struct Emphasis {
     pub text: String,
     pub bold: u8,
     pub italic: u8,
     pub strikethrough: u8,
 }
 
-impl Decoration {
+impl Emphasis {
     pub fn new(text: &str, bold: u8, italic: u8, strikethrough: u8) -> Self {
         Self {
             text: text.to_string(),

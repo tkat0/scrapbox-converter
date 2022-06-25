@@ -88,15 +88,15 @@ impl Visitor for MarkdownGen {
         None
     }
 
-    fn visit_bracket_decoration(&mut self, decoration: &Decoration) -> Option<TransformCommand> {
-        let mut tmp = decoration.text.clone();
-        if decoration.bold > 0 {
+    fn visit_bracket_emphasis(&mut self, emphasis: &Emphasis) -> Option<TransformCommand> {
+        let mut tmp = emphasis.text.clone();
+        if emphasis.bold > 0 {
             tmp = format!("**{}**", tmp);
         }
-        if decoration.italic > 0 {
+        if emphasis.italic > 0 {
             tmp = format!("*{}*", tmp);
         }
-        if decoration.strikethrough > 0 {
+        if emphasis.strikethrough > 0 {
             tmp = format!("~~{}~~", tmp);
         }
         self.document.push_str(&tmp);
@@ -130,7 +130,7 @@ mod test {
             lines: vec![Line::new(
                 LineKind::Normal,
                 vec![Syntax::new(SyntaxKind::Bracket(Bracket::new(
-                    BracketKind::Decoration(Decoration::bold_level("text", 3)),
+                    BracketKind::Emphasis(Emphasis::bold_level("text", 3)),
                 )))],
             )],
         };
@@ -153,7 +153,7 @@ mod test {
             lines: vec![Line::new(
                 LineKind::Normal,
                 vec![Syntax::new(SyntaxKind::Bracket(Bracket::new(
-                    BracketKind::Decoration(Decoration::bold_level("text", 10)),
+                    BracketKind::Emphasis(Emphasis::bold_level("text", 10)),
                 )))],
             )],
         };
@@ -162,8 +162,8 @@ mod test {
 
         assert_eq!(
             page.lines[0].values[0],
-            Syntax::new(SyntaxKind::Bracket(Bracket::new(BracketKind::Decoration(
-                Decoration::bold_level("text", 10)
+            Syntax::new(SyntaxKind::Bracket(Bracket::new(BracketKind::Emphasis(
+                Emphasis::bold_level("text", 10)
             ))))
         )
     }
@@ -180,7 +180,7 @@ mod test {
             lines: vec![Line::new(
                 LineKind::Normal,
                 vec![Syntax::new(SyntaxKind::Bracket(Bracket::new(
-                    BracketKind::Decoration(Decoration::bold_level("text", 1)),
+                    BracketKind::Emphasis(Emphasis::bold_level("text", 1)),
                 )))],
             )],
         };
