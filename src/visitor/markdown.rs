@@ -70,8 +70,8 @@ impl MarkdownGen {
 }
 
 impl Visitor for MarkdownGen {
-    fn visit_page(&mut self, page: &mut Page) {
-        for line in page.lines.iter_mut() {
+    fn visit_page(&mut self, value: &mut Page) {
+        for line in value.lines.iter_mut() {
             if let LineKind::List(list) = &line.kind {
                 let indent = self.config.indent.repeat(list.level - 1);
                 match &list.kind {
@@ -85,49 +85,54 @@ impl Visitor for MarkdownGen {
         }
     }
 
-    fn visit_hashtag(&mut self, hashtag: &HashTag) -> Option<TransformCommand> {
+    fn visit_hashtag(&mut self, value: &HashTag) -> Option<TransformCommand> {
         self.document
-            .push_str(&format!("[#{t}]({t}.md)", t = hashtag.value));
+            .push_str(&format!("[#{t}]({t}.md)", t = value.value));
         None
     }
 
-    fn visit_bracket_internal_link(&mut self, link: &InternalLink) -> Option<TransformCommand> {
+    fn visit_bracket_internal_link(&mut self, value: &InternalLink) -> Option<TransformCommand> {
         self.document
-            .push_str(&format!("[{t}]({t}.md)", t = link.title));
+            .push_str(&format!("[{t}]({t}.md)", t = value.title));
         None
     }
 
-    fn visit_bracket_external_link(&mut self, link: &ExternalLink) -> Option<TransformCommand> {
-        if let Some(title) = &link.title {
+    fn visit_bracket_external_link(&mut self, value: &ExternalLink) -> Option<TransformCommand> {
+        if let Some(title) = &value.title {
             self.document
-                .push_str(&format!("[{}]({})", title, link.url));
+                .push_str(&format!("[{}]({})", title, value.url));
         } else {
-            self.document.push_str(&format!("{}", link.url));
+            self.document.push_str(&format!("{}", value.url));
         }
         None
     }
 
-    fn visit_bracket_emphasis(&mut self, emphasis: &Emphasis) -> Option<TransformCommand> {
-        let mut tmp = emphasis.text.clone();
-        if emphasis.bold > 0 {
+    fn visit_bracket_emphasis(&mut self, value: &Emphasis) -> Option<TransformCommand> {
+        let mut tmp = value.text.clone();
+        if value.bold > 0 {
             tmp = format!("**{}**", tmp);
         }
-        if emphasis.italic > 0 {
+        if value.italic > 0 {
             tmp = format!("*{}*", tmp);
         }
-        if emphasis.strikethrough > 0 {
+        if value.strikethrough > 0 {
             tmp = format!("~~{}~~", tmp);
         }
         self.document.push_str(&tmp);
         None
     }
 
-    fn visit_bracket_heading(&mut self, heading: &Heading) -> Option<TransformCommand> {
+    fn visit_bracket_heading(&mut self, value: &Heading) -> Option<TransformCommand> {
         self.document.push_str(&format!(
             "{} {}",
-            "#".repeat(heading.level as usize),
-            heading.text
+            "#".repeat(value.level as usize),
+            value.text
         ));
+        None
+    }
+
+    fn visit_block_quate(&mut self, value: &BlockQuate) -> Option<TransformCommand> {
+        self.document.push_str(&format!("`{}`", value.value));
         None
     }
 

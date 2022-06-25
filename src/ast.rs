@@ -70,6 +70,7 @@ pub struct Syntax {
 pub enum SyntaxKind {
     HashTag(HashTag),
     Bracket(Bracket),
+    BlockQuate(BlockQuate),
     Text(Text),
 }
 
@@ -109,6 +110,19 @@ pub enum BracketKind {
     ExternalLink(ExternalLink),
     Emphasis(Emphasis),
     Heading(Heading),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct BlockQuate {
+    pub value: String,
+}
+
+impl BlockQuate {
+    pub fn new(value: &str) -> Self {
+        Self {
+            value: value.to_string(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -248,9 +262,7 @@ mod test {
                 ),
                 Line::new(
                     LineKind::List(List::disc(1)),
-                    vec![Syntax::new(SyntaxKind::Text(Text {
-                        value: "abc".to_string(),
-                    }))],
+                    vec![Syntax::new(SyntaxKind::BlockQuate(BlockQuate::new("git")))],
                 ),
             ],
         };

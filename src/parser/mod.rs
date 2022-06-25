@@ -56,6 +56,7 @@ fn syntax(input: &str) -> Result<&str, Option<Syntax>> {
     map(
         alt((
             map(hashtag, |s| Syntax::new(SyntaxKind::HashTag(s))),
+            map(block_quate, |s| Syntax::new(SyntaxKind::BlockQuate(s))),
             map(bracketing, |s| Syntax::new(SyntaxKind::Bracket(s))),
             map(external_link_plain, |s| {
                 Syntax::new(SyntaxKind::Bracket(Bracket::new(
@@ -252,7 +253,12 @@ fn emphasis(input: &str) -> Result<&str, Emphasis> {
 fn math() {}
 
 /// `block_quate`
-fn block_quate() {}
+fn block_quate(input: &str) -> Result<&str, BlockQuate> {
+    map(
+        delimited(char('`'), take_while(|c| c != '`'), char('`')),
+        |v| BlockQuate::new(v),
+    )(input)
+}
 
 /// code:filename.extension
 fn code_block() {}
@@ -318,6 +324,17 @@ mod test {
         assert_eq!(
             list("\t123. abc"),
             Ok(("abc", Some(List::new(ListKind::Decimal, 1))))
+        );
+    }
+
+    #[test]
+    fn block_quate_test() {
+        assert!(block_quate("123abc").is_err());
+        assert!(block_quate("`123abc").is_err());
+        assert_eq!(block_quate("`code`"), Ok(("", BlockQuate::new("code"))));
+        assert_eq!(
+            block_quate("`code` test"),
+            Ok((" test", BlockQuate::new("code")))
         );
     }
 
