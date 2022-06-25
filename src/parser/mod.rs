@@ -43,6 +43,9 @@ fn syntax(input: &str) -> Result<&str, Option<Syntax>> {
             map(bracketing, |s| Syntax {
                 kind: SyntaxKind::Bracket(s),
             }),
+            map(external_link_plain, |s| Syntax {
+                kind: SyntaxKind::Bracket(Bracket::new(BracketKind::ExternalLink(s))),
+            }),
             map(text, |s| Syntax {
                 kind: SyntaxKind::Text(s),
             }),
@@ -133,10 +136,11 @@ fn bracketing(input: &str) -> Result<&str, Bracket> {
     let (input, _) = peek(delimited(char('['), take_while(|c| c != ']'), char(']')))(input)?;
     map(
         alt((
+            map(decoration, |c| BracketKind::Decoration(c)),
             map(external_link, |c| BracketKind::ExternalLink(c)),
             map(internal_link, |c| BracketKind::InternalLink(c)),
         )),
-        |kind| Bracket { kind },
+        |kind| Bracket::new(kind),
     )(input)
 }
 
@@ -146,10 +150,21 @@ fn internal_link(input: &str) -> Result<&str, InternalLink> {
     Ok((input, InternalLink::new(text)))
 }
 
-/// https://www.rust-lang.org/ or [https://www.rust-lang.org/] or [https://www.rust-lang.org/ Rust] or [Rust https://www.rust-lang.org/]
+// https://www.rust-lang.org/
+fn external_link_plain(input: &str) -> Result<&str, ExternalLink> {
+    let (input, protocol) = alt((tag("https://"), tag("http://")))(input)?;
+    let (input, url) = take_until(" ")(input)?; // TODO(tkat0): zenkaku
+    Ok((
+        input,
+        ExternalLink::new(None, &format!("{}{}", protocol, url)),
+    ))
+}
+
+/// [https://www.rust-lang.org/] or [https://www.rust-lang.org/ Rust] or [Rust https://www.rust-lang.org/]
 fn external_link(input: &str) -> Result<&str, ExternalLink> {
     // [https://www.rust-lang.org/]
     fn url(input: &str) -> Result<&str, ExternalLink> {
+        let (input, _) = opt(space0)(input)?;
         let (input, protocol) = alt((tag("https://"), tag("http://")))(input)?;
         let (input, url) = take_until("]")(input)?;
         // let (input, _) = char(']')(input)?;
@@ -274,11 +289,30 @@ mod test {
     }
 
     #[test]
+    fn external_link_plain_test() {
+        assert_eq!(
+            external_link_plain("https://www.rust-lang.org/ abc"),
+            Ok((
+                " abc",
+                ExternalLink::new(None, "https://www.rust-lang.org/")
+            ))
+        );
+    }
+
+    #[test]
     fn external_link_test() {
         assert_eq!(
             external_link("[https://www.rust-lang.org/]"),
             Ok(("", ExternalLink::new(None, "https://www.rust-lang.org/")))
         );
+        assert_eq!(
+            external_link("[  https://www.rust-lang.org/]"),
+            Ok(("", ExternalLink::new(None, "https://www.rust-lang.org/")))
+        );
+        // assert_eq!(
+        //     external_link("[  https://www.rust-lang.org/  ]"),
+        //     Ok(("", ExternalLink::new(None, "https://www.rust-lang.org/")))
+        // );
         assert_eq!(
             external_link("[Rust https://www.rust-lang.org/]"),
             Ok((
@@ -294,9 +328,25 @@ mod test {
             ))
         );
         // assert_eq!(
+        //     external_link("[https://www.rust-lang.org/    Rust]"),
+        //     Ok((
+        //         "",
+        //         ExternalLink::new(Some("Rust"), "https://www.rust-lang.org/")
+        //     ))
+        // );
+        // assert!(external_link("[ https://www.rust-lang.org/ Rust ]").is_err());
+
+        // assert_eq!(
         //     external_link("https://www.rust-lang.org/"),
         //     Ok(("", ExternalLink::new(None, "https://www.rust-lang.org/]")))
         // );
+        assert_eq!(
+            external_link("[https://www.rust-lang.org/]\n[*-/ text]"),
+            Ok((
+                "\n[*-/ text]",
+                ExternalLink::new(None, "https://www.rust-lang.org/]")
+            ))
+        );
     }
 
     #[test]
@@ -305,21 +355,17 @@ mod test {
             bracketing("[title]"),
             Ok((
                 "",
-                Bracket {
-                    kind: BracketKind::InternalLink(InternalLink::new("title"))
-                }
+                Bracket::new(BracketKind::InternalLink(InternalLink::new("title")))
             ))
         );
         assert_eq!(
             bracketing("[https://www.rust-lang.org/]"),
             Ok((
                 "",
-                Bracket {
-                    kind: BracketKind::ExternalLink(ExternalLink::new(
+                Bracket::new(BracketKind::ExternalLink(ExternalLink::new(
                         None,
                         "https://www.rust-lang.org/"
-                    ))
-                }
+                )))
             ))
         );
     }
@@ -351,9 +397,9 @@ mod test {
             Ok((
                 "abc",
                 Some(Syntax {
-                    kind: SyntaxKind::Bracket(Bracket {
-                        kind: BracketKind::InternalLink(InternalLink::new("title"))
-                    })
+                    kind: SyntaxKind::Bracket(Bracket::new(BracketKind::InternalLink(
+                        InternalLink::new("title")
+                    )))
                 })
             ))
         );
@@ -392,9 +438,9 @@ mod test {
                             kind: SyntaxKind::Text(Text::new(" "))
                         },
                         Syntax {
-                            kind: SyntaxKind::Bracket(Bracket {
-                                kind: BracketKind::InternalLink(InternalLink::new("internal link"))
-                            })
+                            kind: SyntaxKind::Bracket(Bracket::new(BracketKind::InternalLink(
+                                InternalLink::new("internal link")
+                            )))
                         },
                     ],
                 }
@@ -404,7 +450,7 @@ mod test {
 
     #[test]
     fn page_test() {
-        let actual = page("abc\n#efg [internal link][https://www.rust-lang.org/]\n");
+        let actual = page("abc\n#efg [internal link][https://www.rust-lang.org/]\n[*-/ text]");
         let expected = Page {
             lines: vec![
                 Line {
@@ -427,21 +473,24 @@ mod test {
                             }),
                         },
                         Syntax {
-                            kind: SyntaxKind::Bracket(Bracket {
-                                kind: BracketKind::InternalLink(InternalLink::new("internal link")),
-                            }),
+                            kind: SyntaxKind::Bracket(Bracket::new(BracketKind::InternalLink(
+                                InternalLink::new("internal link"),
+                            ))),
                         },
                         Syntax {
-                            kind: SyntaxKind::Bracket(Bracket {
-                                kind: BracketKind::ExternalLink(ExternalLink::new(
-                                    None,
-                                    "https://www.rust-lang.org/",
-                                )),
-                            }),
+                            kind: SyntaxKind::Bracket(Bracket::new(BracketKind::ExternalLink(
+                                ExternalLink::new(None, "https://www.rust-lang.org/"),
+                            ))),
                         },
                     ],
                 },
-                Line { items: vec![] },
+                Line {
+                    items: vec![Syntax {
+                        kind: SyntaxKind::Bracket(Bracket::new(BracketKind::Decoration(
+                            Decoration::new("text", 1, 1, 1),
+                        ))),
+                    }],
+                },
             ],
         };
         assert_eq!(actual, Ok(("", expected)))

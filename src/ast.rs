@@ -20,7 +20,12 @@ pub enum SyntaxKind {
     Text(Text),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+impl Syntax {
+    pub fn new(kind: SyntaxKind) -> Self {
+        Self { kind }
+    }
+}
+
 pub struct HashTag {
     pub value: String,
 }
@@ -36,6 +41,12 @@ impl HashTag {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Bracket {
     pub kind: BracketKind,
+}
+
+impl Bracket {
+    pub fn new(kind: BracketKind) -> Self {
+        Self { kind }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -124,12 +135,9 @@ mod test {
                         }),
                     },
                     Syntax {
-                        kind: SyntaxKind::Bracket(Bracket {
-                            kind: BracketKind::ExternalLink(ExternalLink::new(
-                                Some("Rust"),
-                                "https://www.rust-lang.org/",
-                            )),
-                        }),
+                        kind: SyntaxKind::Bracket(Bracket::new(BracketKind::ExternalLink(
+                            ExternalLink::new(Some("Rust"), "https://www.rust-lang.org/"),
+                        ))),
                     },
                 ],
             }],
