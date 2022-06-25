@@ -1,6 +1,6 @@
 use std::convert::identity;
 
-use nom::character::complete::{char, digit1, space0};
+use nom::character::complete::{char, digit1, space0, space1};
 use nom::combinator::{opt, peek};
 use nom::error::{ParseError, VerboseError};
 use nom::multi::many1;
@@ -178,15 +178,17 @@ fn external_link_plain(input: &str) -> Result<&str, ExternalLink> {
 
 /// [https://www.rust-lang.org/] or [https://www.rust-lang.org/ Rust] or [Rust https://www.rust-lang.org/]
 fn external_link(input: &str) -> Result<&str, ExternalLink> {
+    let (input, text) = delimited(char('['), take_while(|c| c != ']'), char(']'))(input)?;
+
+    dbg!(text);
+
     // [https://www.rust-lang.org/]
     fn url(input: &str) -> Result<&str, ExternalLink> {
-        let (input, _) = opt(space0)(input)?;
-        let (input, protocol) = alt((tag("https://"), tag("http://")))(input)?;
-        let (input, url) = take_until("]")(input)?;
-        // let (input, _) = char(']')(input)?;
+        let (input, _) = space0(input)?; // TODO(tkat0): zenkaku
+        let (url, protocol) = alt((tag("https://"), tag("http://")))(input)?;
         Ok((
-            input,
-            ExternalLink::new(None, &format!("{}{}", protocol, url)),
+            "",
+            ExternalLink::new(None, &format!("{}{}", protocol, url.trim())),
         ))
     }
 
@@ -194,29 +196,31 @@ fn external_link(input: &str) -> Result<&str, ExternalLink> {
     fn url_title(input: &str) -> Result<&str, ExternalLink> {
         let (input, protocol) = alt((tag("https://"), tag("http://")))(input)?;
         let (input, url) = take_until(" ")(input)?;
-        let (input, _) = char(' ')(input)?;
-        let (input, title) = take_until("]")(input)?;
-        // let (input, _) = char(']')(input)?;
+        let (title, _) = space1(input)?; // TODO(tkat0): zenkaku
+        let title = if title.is_empty() { None } else { Some(title) };
         Ok((
-            input,
-            ExternalLink::new(Some(title), &format!("{}{}", protocol, url)),
+            "",
+            ExternalLink::new(title, &format!("{}{}", protocol, url)),
         ))
     }
 
     // [Rust https://www.rust-lang.org/]
     fn title_url(input: &str) -> Result<&str, ExternalLink> {
         let (input, title) = take_until(" ")(input)?;
-        let (input, _) = char(' ')(input)?;
-        let (input, protocol) = alt((tag("https://"), tag("http://")))(input)?;
-        let (input, url) = take_until("]")(input)?;
-        // let (input, _) = char(']')(input)?;
+        let title = if title.is_empty() { None } else { Some(title) };
+        let (input, _) = space1(input)?; // TODO(tkat0): zenkaku
+        let (url, protocol) = alt((tag("https://"), tag("http://")))(input)?;
         Ok((
-            input,
-            ExternalLink::new(Some(title), &format!("{}{}", protocol, url)),
+            "",
+            ExternalLink::new(title, &format!("{}{}", protocol, url.trim())),
         ))
     }
 
-    delimited(char('['), alt((url_title, title_url, url)), char(']'))(input)
+    let (rest, link) = alt((url_title, title_url, url))(text)?;
+    dbg!(rest);
+    dbg!(&link);
+    assert!(rest.is_empty());
+    Ok((input, link))
 }
 
 /// [http://cutedog.com https://i.gyazo.com/da78df293f9e83a74b5402411e2f2e01.png]
@@ -427,10 +431,10 @@ mod test {
             external_link("[  https://www.rust-lang.org/]"),
             Ok(("", ExternalLink::new(None, "https://www.rust-lang.org/")))
         );
-        // assert_eq!(
-        //     external_link("[  https://www.rust-lang.org/  ]"),
-        //     Ok(("", ExternalLink::new(None, "https://www.rust-lang.org/")))
-        // );
+        assert_eq!(
+            external_link("[  https://www.rust-lang.org/  ]"),
+            Ok(("", ExternalLink::new(None, "https://www.rust-lang.org/")))
+        );
         assert_eq!(
             external_link("[Rust https://www.rust-lang.org/]"),
             Ok((
@@ -445,26 +449,21 @@ mod test {
                 ExternalLink::new(Some("Rust"), "https://www.rust-lang.org/")
             ))
         );
-        // assert_eq!(
-        //     external_link("[https://www.rust-lang.org/    Rust]"),
-        //     Ok((
-        //         "",
-        //         ExternalLink::new(Some("Rust"), "https://www.rust-lang.org/")
-        //     ))
-        // );
+        assert_eq!(
+            external_link("[https://www.rust-lang.org/    Rust]"),
+            Ok((
+                "",
+                ExternalLink::new(Some("Rust"), "https://www.rust-lang.org/")
+            ))
+        );
         // assert!(external_link("[ https://www.rust-lang.org/ Rust ]").is_err());
-
-        // assert_eq!(
-        //     external_link("https://www.rust-lang.org/"),
-        //     Ok(("", ExternalLink::new(None, "https://www.rust-lang.org/]")))
-        // );
-        // assert_eq!(
-        //     external_link("[https://www.rust-lang.org/]\n[*-/ text]"),
-        //     Ok((
-        //         "\n[*-/ text]",
-        //         ExternalLink::new(None, "https://www.rust-lang.org/]")
-        //     ))
-        // );
+        assert_eq!(
+            external_link("[https://www.rust-lang.org/]\n[*-/ text]"),
+            Ok((
+                "\n[*-/ text]",
+                ExternalLink::new(None, "https://www.rust-lang.org/")
+            ))
+        );
     }
 
     #[test]
