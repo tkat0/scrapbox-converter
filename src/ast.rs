@@ -71,6 +71,7 @@ pub enum SyntaxKind {
     HashTag(HashTag),
     Bracket(Bracket),
     BlockQuate(BlockQuate),
+    CodeBlock(CodeBlock),
     Text(Text),
 }
 
@@ -121,6 +122,21 @@ impl BlockQuate {
     pub fn new(value: &str) -> Self {
         Self {
             value: value.to_string(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct CodeBlock {
+    pub file_name: String,
+    pub value: Vec<String>,
+}
+
+impl CodeBlock {
+    pub fn new(file_name: &str, value: Vec<&str>) -> Self {
+        Self {
+            file_name: file_name.to_string(),
+            value: value.iter().map(|s| s.to_string()).collect(),
         }
     }
 }

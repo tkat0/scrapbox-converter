@@ -134,6 +134,15 @@ impl Visitor for MarkdownGen {
         None
     }
 
+    fn visit_code_block(&mut self, value: &CodeBlock) -> Option<TransformCommand> {
+        self.document.push_str(&format!("```{}\n", value.file_name));
+        for code in &value.value {
+            self.document.push_str(&format!("{}\n", code));
+        }
+        self.document.push_str("```");
+        None
+    }
+
     fn visit_text(&mut self, text: &Text) -> Option<TransformCommand> {
         self.document.push_str(&format!("{}", text.value));
         None
@@ -249,6 +258,13 @@ mod test {
                         value: "abc".to_string(),
                     }))],
                 ),
+                Line::new(
+                    LineKind::Normal,
+                    vec![Syntax::new(SyntaxKind::CodeBlock(CodeBlock::new(
+                        "hello.rs",
+                        vec!["fn main() {", "    println(\"Hello, World!\");", "}"],
+                    )))],
+                ),
             ],
         };
 
@@ -256,7 +272,7 @@ mod test {
 
         assert_eq!(
             markdown,
-            "abc [#tag](tag.md) [Rust](https://www.rust-lang.org/)\n  * abc\n"
+            "abc #tag [Rust](https://www.rust-lang.org/)\n  * abc\n```hello.rs\nfn main() {\n    println(\"Hello, World!\");\n}\n```\n"
         )
     }
 }

@@ -57,6 +57,7 @@ fn syntax(input: &str) -> Result<&str, Option<Syntax>> {
         alt((
             map(hashtag, |s| Syntax::new(SyntaxKind::HashTag(s))),
             map(block_quate, |s| Syntax::new(SyntaxKind::BlockQuate(s))),
+            map(code_block, |s| Syntax::new(SyntaxKind::CodeBlock(s))),
             map(bracketing, |s| Syntax::new(SyntaxKind::Bracket(s))),
             map(external_link_plain, |s| {
                 Syntax::new(SyntaxKind::Bracket(Bracket::new(
@@ -261,7 +262,16 @@ fn block_quate(input: &str) -> Result<&str, BlockQuate> {
 }
 
 /// code:filename.extension
-fn code_block() {}
+/// TODO(tkat0): List + CodeBlock is not supported yet.
+fn code_block(input: &str) -> Result<&str, CodeBlock> {
+    let (input, _) = tag("code:")(input)?;
+    let (input, file_name) = take_until("\n")(input)?;
+    let (input, _) = char('\n')(input)?;
+    map(
+        many0(delimited(char('\t'), take_while(|c| c != '\n'), char('\n'))),
+        |codes| CodeBlock::new(file_name, codes),
+    )(input)
+}
 
 /// table:name
 /// a<tab>
@@ -335,6 +345,17 @@ mod test {
         assert_eq!(
             block_quate("`code` test"),
             Ok((" test", BlockQuate::new("code")))
+        );
+    }
+
+    #[test]
+    fn code_block_test() {
+        assert_eq!(
+            code_block("code:hello.rs\n\t    panic!()\n\t    panic!()\n"),
+            Ok((
+                "",
+                CodeBlock::new("hello.rs", vec!["    panic!()", "    panic!()"])
+            ))
         );
     }
 

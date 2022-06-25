@@ -58,6 +58,7 @@ pub trait Visitor {
             SyntaxKind::HashTag(v) => self.visit_hashtag(&v),
             SyntaxKind::Bracket(v) => self.visit_bracket(&v),
             SyntaxKind::BlockQuate(v) => self.visit_block_quate(&v),
+            SyntaxKind::CodeBlock(v) => self.visit_code_block(&v),
             SyntaxKind::Text(v) => self.visit_text(&v),
         }
     }
@@ -92,6 +93,10 @@ pub trait Visitor {
     }
 
     fn visit_block_quate(&mut self, _value: &BlockQuate) -> Option<TransformCommand> {
+        None
+    }
+
+    fn visit_code_block(&mut self, _value: &CodeBlock) -> Option<TransformCommand> {
         None
     }
 
