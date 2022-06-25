@@ -3,9 +3,21 @@ pub struct Page {
     pub lines: Vec<Line>,
 }
 
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Line {
-    pub items: Vec<Syntax>,
+    pub kind: LineKind,
+    pub values: Vec<Syntax>,
+}
+
+impl Line {
+    pub fn new(kind: LineKind, values: Vec<Syntax>) -> Self {
+        Self { kind, values }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum LineKind {
+    Normal,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -172,8 +184,9 @@ mod test {
     #[test]
     fn ast_test() {
         let page = Page {
-            lines: vec![Line {
-                items: vec![
+            lines: vec![Line::new(
+                LineKind::Normal,
+                vec![
                     Syntax {
                         kind: SyntaxKind::Text(Text {
                             value: "abc".to_string(),
@@ -195,7 +208,7 @@ mod test {
                         ))),
                     },
                 ],
-            }],
+            )],
         };
 
         dbg!(page);

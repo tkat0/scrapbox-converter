@@ -3,6 +3,7 @@ import { ExternalLinkIcon } from "@chakra-ui/icons";
 import React, { useEffect, useState } from "react";
 
 import { scrapboxToMarkdown } from "../main";
+import { defaultData } from "./data";
 
 interface FormProps {
   value: string;
@@ -16,13 +17,13 @@ const Form = (props: FormProps) => {
       value={value}
       onChange={onChange}
       isReadOnly={onChange === undefined}
-      h="300px"
+      h="600px"
     />
   );
 };
 
 function App() {
-  const [src, setSrc] = useState("[Scrapbox https://scrapbox.io]");
+  const [src, setSrc] = useState(defaultData);
   const [dst, setDst] = useState(src);
 
   useEffect(() => {

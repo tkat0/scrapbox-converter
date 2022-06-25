@@ -24,8 +24,9 @@ pub trait Visitor {
     }
 
     fn visit_line(&mut self, line: &mut Line) {
+        // Execute all syntaxes' commands
         let mut commands = HashMap::new();
-        for (i, item) in line.items.iter().enumerate() {
+        for (i, item) in line.values.iter().enumerate() {
             let command = self.visit_syntax(item);
             if let Some(c) = command {
                 commands.insert(i, c);
@@ -35,13 +36,13 @@ pub trait Visitor {
         // Replace
         for (&i, command) in &commands {
             if let TransformCommand::Replace(s) = command {
-                line.items[i] = s.clone();
+                line.values[i] = s.clone();
             }
         }
 
         // Delete
         let mut i = 0;
-        line.items.retain(|_| {
+        line.values.retain(|_| {
             let retain = if let Some(TransformCommand::Delete) = commands.get(&i) {
                 false
             } else {

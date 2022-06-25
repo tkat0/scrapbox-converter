@@ -29,8 +29,11 @@ fn line(input: &str) -> Result<&str, Line> {
     }
     // skip '\n' if it is at the beginning of the line.
     let (input, _) = opt(char('\n'))(input)?;
-    map(many0(syntax), |c| Line {
-        items: c.into_iter().filter_map(identity).collect(),
+    map(many0(syntax), |c| {
+        Line::new(
+            LineKind::Normal,
+            c.into_iter().filter_map(identity).collect(),
+        )
     })(input)
 }
 
@@ -446,85 +449,64 @@ mod test {
             line(" "),
             Ok((
                 "",
-                Line {
-                    items: vec![Syntax {
-                        kind: SyntaxKind::Text(Text::new(" "))
-                    },],
-                }
+                Line::new(
+                    LineKind::Normal,
+                    vec![Syntax::new(SyntaxKind::Text(Text::new(" ")))]
+                ),
             ))
         );
         assert_eq!(
             line("#tag #tag [internal link]\n"),
             Ok((
                 "\n",
-                Line {
-                    items: vec![
-                        Syntax {
-                            kind: SyntaxKind::HashTag(HashTag::new("tag"))
-                        },
-                        Syntax {
-                            kind: SyntaxKind::Text(Text::new(" "))
-                        },
-                        Syntax {
-                            kind: SyntaxKind::HashTag(HashTag::new("tag"))
-                        },
-                        Syntax {
-                            kind: SyntaxKind::Text(Text::new(" "))
-                        },
-                        Syntax {
-                            kind: SyntaxKind::Bracket(Bracket::new(BracketKind::InternalLink(
-                                InternalLink::new("internal link")
-                            )))
-                        },
-                    ],
-                }
+                Line::new(
+                    LineKind::Normal,
+                    vec![
+                        Syntax::new(SyntaxKind::HashTag(HashTag::new("tag"))),
+                        Syntax::new(SyntaxKind::Text(Text::new(" "))),
+                        Syntax::new(SyntaxKind::HashTag(HashTag::new("tag"))),
+                        Syntax::new(SyntaxKind::Text(Text::new(" "))),
+                        Syntax::new(SyntaxKind::Bracket(Bracket::new(
+                            BracketKind::InternalLink(InternalLink::new("internal link"))
+                        ))),
+                    ]
+                )
             ))
         );
     }
 
     #[test]
     fn page_test() {
-        let actual = page("abc\n#efg [internal link][https://www.rust-lang.org/]\n[*-/ text]");
+        let actual = page("abc\n#efg [internal link][https://www.rust-lang.org/]\n");
         let expected = Page {
             lines: vec![
-                Line {
-                    items: vec![Syntax {
-                        kind: SyntaxKind::Text(Text {
+                Line::new(
+                    LineKind::Normal,
+                    vec![Syntax::new(SyntaxKind::Text(Text {
                             value: "abc".to_string(),
-                        }),
-                    }],
-                },
-                Line {
-                    items: vec![
-                        Syntax {
-                            kind: SyntaxKind::HashTag(HashTag {
+                    }))],
+                ),
+                Line::new(
+                    LineKind::Normal,
+                    vec![
+                        Syntax::new(SyntaxKind::HashTag(HashTag {
                                 value: "efg".to_string(),
-                            }),
-                        },
-                        Syntax {
-                            kind: SyntaxKind::Text(Text {
+                        })),
+                        Syntax::new(SyntaxKind::Text(Text {
                                 value: " ".to_string(),
-                            }),
-                        },
-                        Syntax {
-                            kind: SyntaxKind::Bracket(Bracket::new(BracketKind::InternalLink(
-                                InternalLink::new("internal link"),
+                        })),
+                        Syntax::new(SyntaxKind::Bracket(Bracket::new(
+                            BracketKind::InternalLink(InternalLink::new("internal link")),
                             ))),
-                        },
-                        Syntax {
-                            kind: SyntaxKind::Bracket(Bracket::new(BracketKind::ExternalLink(
-                                ExternalLink::new(None, "https://www.rust-lang.org/"),
+                        Syntax::new(SyntaxKind::Bracket(Bracket::new(
+                            BracketKind::ExternalLink(ExternalLink::new(
+                                None,
+                                "https://www.rust-lang.org/",
+                            )),
                             ))),
-                        },
                     ],
-                },
-                Line {
-                    items: vec![Syntax {
-                        kind: SyntaxKind::Bracket(Bracket::new(BracketKind::Decoration(
-                            Decoration::new("text", 1, 1, 1),
-                        ))),
-                    }],
-                },
+                ),
+                Line::new(LineKind::Normal, vec![]),
             ],
         };
         assert_eq!(actual, Ok(("", expected)))

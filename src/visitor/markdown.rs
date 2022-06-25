@@ -123,17 +123,18 @@ mod test {
         let mut pass = MarkdownPass::default();
 
         let mut page = Page {
-            lines: vec![Line {
-                items: vec![Syntax::new(SyntaxKind::Bracket(Bracket::new(
+            lines: vec![Line::new(
+                LineKind::Normal,
+                vec![Syntax::new(SyntaxKind::Bracket(Bracket::new(
                     BracketKind::Decoration(Decoration::bold_level("text", 3)),
                 )))],
-            }],
+            )],
         };
 
         pass.visit(&mut page);
 
         assert_eq!(
-            page.lines[0].items[0],
+            page.lines[0].values[0],
             Syntax::new(SyntaxKind::Bracket(Bracket::new(BracketKind::Heading(
                 Heading::new("text", 1)
             ))))
@@ -145,17 +146,18 @@ mod test {
         let mut pass = MarkdownPass::default();
 
         let mut page = Page {
-            lines: vec![Line {
-                items: vec![Syntax::new(SyntaxKind::Bracket(Bracket::new(
+            lines: vec![Line::new(
+                LineKind::Normal,
+                vec![Syntax::new(SyntaxKind::Bracket(Bracket::new(
                     BracketKind::Decoration(Decoration::bold_level("text", 10)),
                 )))],
-            }],
+            )],
         };
 
         pass.visit(&mut page);
 
         assert_eq!(
-            page.lines[0].items[0],
+            page.lines[0].values[0],
             Syntax::new(SyntaxKind::Bracket(Bracket::new(BracketKind::Decoration(
                 Decoration::bold_level("text", 10)
             ))))
@@ -169,18 +171,20 @@ mod test {
             bold_to_h: true,
         };
 
+        // TODO(tkat0): not supoprted: `[*-/ mix]` -> `### *~~mix~~*` (but `### mix`)
         let mut page = Page {
-            lines: vec![Line {
-                items: vec![Syntax::new(SyntaxKind::Bracket(Bracket::new(
+            lines: vec![Line::new(
+                LineKind::Normal,
+                vec![Syntax::new(SyntaxKind::Bracket(Bracket::new(
                     BracketKind::Decoration(Decoration::bold_level("text", 1)),
                 )))],
-            }],
+            )],
         };
 
         pass.visit(&mut page);
 
         assert_eq!(
-            page.lines[0].items[0],
+            page.lines[0].values[0],
             Syntax::new(SyntaxKind::Bracket(Bracket::new(BracketKind::Heading(
                 Heading::new("text", 3)
             ))))
@@ -192,8 +196,9 @@ mod test {
         let mut visitor = MarkdownGen::new();
 
         let mut page = Page {
-            lines: vec![Line {
-                items: vec![
+            lines: vec![Line::new(
+                LineKind::Normal,
+                vec![
                     Syntax {
                         kind: SyntaxKind::Text(Text {
                             value: "abc ".to_string(),
@@ -215,7 +220,7 @@ mod test {
                         ))),
                     },
                 ],
-            }],
+            )],
         };
 
         let markdown = visitor.generate(&mut page);
