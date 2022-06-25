@@ -25,7 +25,10 @@ impl Default for MarkdownPass {
 impl Visitor for MarkdownPass {
     fn visit_bracket_decoration(&mut self, decoration: &Decoration) -> Option<TransformCommand> {
         let h_level = (self.h1_level + 1).saturating_sub(decoration.bold);
-        if h_level > 0 && (self.bold_to_h || (!self.bold_to_h && decoration.bold > 1)) {
+        if 0 < h_level
+            && h_level <= self.h1_level
+            && (self.bold_to_h || (!self.bold_to_h && decoration.bold > 1))
+        {
             Some(TransformCommand::Replace(Syntax::new(SyntaxKind::Bracket(
                 Bracket::new(BracketKind::Heading(Heading::new(
                     &decoration.text,
