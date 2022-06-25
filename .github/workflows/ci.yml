@@ -2,9 +2,8 @@ name: CI
 
 on:
   push:
-    branches: ["main"]
-  pull_request:
-    branches: ["main"]
+    branches:
+      - "main"
 
 env:
   CARGO_TERM_COLOR: always
@@ -34,4 +33,7 @@ jobs:
       - run: npm run build
       - run: npm test
       - name: Deploy to GitHub Pages
-        run: ./scripts/deploy-to-gh-pages.sh
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          branch: gh-pages
+          folder: ./dist
