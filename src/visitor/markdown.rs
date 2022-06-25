@@ -67,7 +67,8 @@ impl Visitor for MarkdownGen {
     }
 
     fn visit_hashtag(&mut self, hashtag: &HashTag) -> Option<TransformCommand> {
-        self.document.push_str(&format!("#{}", hashtag.value));
+        self.document
+            .push_str(&format!("[#{t}]({t}.md)", t = hashtag.value));
         None
     }
 
@@ -228,6 +229,9 @@ mod test {
 
         let markdown = visitor.generate(&mut page);
 
-        assert_eq!(markdown, "abc #tag [Rust](https://www.rust-lang.org/)\n")
+        assert_eq!(
+            markdown,
+            "abc [#tag](tag.md) [Rust](https://www.rust-lang.org/)\n"
+        )
     }
 }
