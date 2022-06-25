@@ -1,6 +1,6 @@
 use std::convert::identity;
 
-use nom::character::complete::char;
+use nom::character::complete::{char, space0};
 use nom::combinator::{opt, peek};
 use nom::error::{ParseError, VerboseError};
 use nom::IResult;
@@ -209,17 +209,30 @@ fn image() {}
 /// [/icons/todo.icon]
 fn icon() {}
 
-// [*-/** decoration]
-fn decoration() {}
-
+/// [*-/** decoration]
 /// [[Bold]] or [* Bold] or [*** Bold]
-fn bold() {}
-
 /// [/ italic]
-fn italic() {}
-
 /// [- strikethrough]
-fn strikethrough() {}
+fn decoration(input: &str) -> Result<&str, Decoration> {
+    let (input, text) = delimited(char('['), take_while(|c| c != ']'), char(']'))(input)?;
+
+    let (rest, tokens) = take_while(|c| ['*', '/', '-'].contains(&c))(text)?;
+    let (text, _) = char(' ')(rest)?;
+
+    let mut bold = 0;
+    let mut italic = 0;
+    let mut strikethrough = 0;
+    for c in tokens.chars() {
+        match &c {
+            '*' => bold += 1,
+            '/' => italic += 1,
+            '-' => strikethrough += 1,
+            _ => {}
+        }
+    }
+
+    Ok((input, Decoration::new(text, bold, italic, strikethrough)))
+}
 
 /// [$ Tex here]
 fn math() {}
@@ -260,6 +273,27 @@ mod test {
         assert_eq!(hashtag("#[tag"), Ok(("", HashTag::new("[tag"))));
         // assert!(hashtag("#[tag]").is_err());
         // assert!(hashtag("# tag").is_err());
+    }
+
+    #[test]
+    fn decoration_test() {
+        assert_eq!(
+            decoration("[* text]"),
+            Ok(("", Decoration::bold_level("text", 1)))
+        );
+        assert_eq!(
+            decoration("[***** text]"),
+            Ok(("", Decoration::bold_level("text", 5)))
+        );
+        assert_eq!(decoration("[/ text]"), Ok(("", Decoration::italic("text"))));
+        assert_eq!(
+            decoration("[- text]"),
+            Ok(("", Decoration::strikethrough("text")))
+        );
+        assert_eq!(
+            decoration("[*/*-* text]"),
+            Ok(("", Decoration::new("text", 3, 1, 1)))
+        );
     }
 
     #[test]
@@ -363,8 +397,8 @@ mod test {
             Ok((
                 "",
                 Bracket::new(BracketKind::ExternalLink(ExternalLink::new(
-                        None,
-                        "https://www.rust-lang.org/"
+                    None,
+                    "https://www.rust-lang.org/"
                 )))
             ))
         );
