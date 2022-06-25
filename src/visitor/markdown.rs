@@ -86,14 +86,12 @@ impl Visitor for MarkdownGen {
     }
 
     fn visit_hashtag(&mut self, value: &HashTag) -> Option<TransformCommand> {
-        self.document
-            .push_str(&format!("[#{t}]({t}.md)", t = value.value));
+        self.document.push_str(&format!("#{}", value.value));
         None
     }
 
     fn visit_bracket_internal_link(&mut self, value: &InternalLink) -> Option<TransformCommand> {
-        self.document
-            .push_str(&format!("[{t}]({t}.md)", t = value.title));
+        self.document.push_str(&format!("[[{}]]", value.title));
         None
     }
 
