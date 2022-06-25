@@ -1,8 +1,10 @@
 use std::convert::identity;
 
-use nom::character::complete::{char, space0};
+use nom::character::complete::{char, digit1, space0};
 use nom::combinator::{opt, peek};
 use nom::error::{ParseError, VerboseError};
+use nom::multi::many1;
+use nom::sequence::terminated;
 use nom::IResult;
 use nom::{
     branch::alt,
@@ -27,14 +29,27 @@ fn line(input: &str) -> Result<&str, Line> {
     if input.is_empty() {
         return Err(Err::Error(VerboseError::from_char(input, ' ')));
     }
+
     // skip '\n' if it is at the beginning of the line.
     let (input, _) = opt(char('\n'))(input)?;
-    map(many0(syntax), |c| {
-        Line::new(
-            LineKind::Normal,
-            c.into_iter().filter_map(identity).collect(),
-        )
-    })(input)
+
+    let (input, list) = list(input)?;
+
+    if let Some(list) = &list {
+        map(many0(syntax), |c| {
+            Line::new(
+                LineKind::List(list.clone()),
+                c.into_iter().filter_map(identity).collect(),
+            )
+        })(input)
+    } else {
+        map(many0(syntax), |c| {
+            Line::new(
+                LineKind::Normal,
+                c.into_iter().filter_map(identity).collect(),
+            )
+        })(input)
+    }
 }
 
 fn syntax(input: &str) -> Result<&str, Option<Syntax>> {
@@ -256,7 +271,26 @@ fn commandline() {}
 fn helpfeel() {}
 
 /// <tab>
-fn bullet_points() {}
+/// <tab>1.
+fn list(input: &str) -> Result<&str, Option<List>> {
+    let (input, tabs) = opt(many1(char('\t')))(input)?;
+    let (input, decimal) = opt(terminated(digit1, tag(". ")))(input)?;
+    if let Some(tabs) = tabs {
+        let kind = match &decimal {
+            Some(_) => ListKind::Decimal,
+            None => ListKind::Disc,
+        };
+        Ok((
+            input,
+            Some(List {
+                level: tabs.len(),
+                kind,
+            }),
+        ))
+    } else {
+        Ok((input, None))
+    }
+}
 
 mod test {
     #[warn(unused_imports)]
@@ -275,15 +309,18 @@ mod test {
     }
 
     #[test]
-    fn decoration_test() {
+    fn list_test() {
+        assert_eq!(list("123abc"), Ok(("123abc", None)));
         assert_eq!(
-            decoration("[* text]"),
-            Ok(("", Decoration::bold_level("text", 1)))
+            list("\t\t123abc"),
+            Ok(("123abc", Some(List::new(ListKind::Disc, 2))))
         );
         assert_eq!(
-            decoration("[***** text]"),
-            Ok(("", Decoration::bold_level("text", 5)))
+            list("\t123. abc"),
+            Ok(("abc", Some(List::new(ListKind::Decimal, 1))))
         );
+    }
+
     #[test]
     fn emphasis_test() {
         assert_eq!(

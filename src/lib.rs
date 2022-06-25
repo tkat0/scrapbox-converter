@@ -1,6 +1,6 @@
 use parser::page;
 use visitor::{
-    markdown::{MarkdownGen, MarkdownPass},
+    markdown::{MarkdownGen, MarkdownGenConfig, MarkdownPass},
     Visitor,
 };
 use wasm_bindgen::prelude::*;
@@ -14,9 +14,9 @@ pub fn scrapbox_to_markdown(input: &str) -> String {
     let (_, mut p) = page(input).unwrap();
     let mut pass = MarkdownPass {
         h1_level: 3,
-        bold_to_h: true,
+        bold_to_h: false,
     };
     pass.visit(&mut p);
-    let mut visitor = MarkdownGen::new();
+    let mut visitor = MarkdownGen::new(MarkdownGenConfig::default());
     visitor.generate(&mut p)
 }

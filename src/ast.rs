@@ -18,6 +18,47 @@ impl Line {
 #[derive(Debug, Clone, PartialEq)]
 pub enum LineKind {
     Normal,
+    List(List),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct List {
+    pub kind: ListKind,
+    pub level: usize,
+}
+
+impl List {
+    pub fn new(kind: ListKind, level: usize) -> Self {
+        Self { kind, level }
+    }
+
+    pub fn disc(level: usize) -> Self {
+        Self {
+            kind: ListKind::Disc,
+            level,
+        }
+    }
+
+    pub fn decimal(level: usize) -> Self {
+        Self {
+            kind: ListKind::Decimal,
+            level,
+        }
+    }
+
+    pub fn alphabet(level: usize) -> Self {
+        Self {
+            kind: ListKind::Alphabet,
+            level,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum ListKind {
+    Disc,
+    Decimal,
+    Alphabet,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -184,26 +225,34 @@ mod test {
     #[test]
     fn ast_test() {
         let page = Page {
-            lines: vec![Line::new(
-                LineKind::Normal,
-                vec![
-                    Syntax::new(SyntaxKind::Text(Text {
+            lines: vec![
+                Line::new(
+                    LineKind::Normal,
+                    vec![
+                        Syntax::new(SyntaxKind::Text(Text {
                             value: "abc".to_string(),
-                    })),
-                    Syntax::new(SyntaxKind::HashTag(HashTag {
+                        })),
+                        Syntax::new(SyntaxKind::HashTag(HashTag {
                             value: "tag".to_string(),
-                    })),
-                    Syntax::new(SyntaxKind::Text(Text {
+                        })),
+                        Syntax::new(SyntaxKind::Text(Text {
                             value: " ".to_string(),
-                    })),
-                    Syntax::new(SyntaxKind::Bracket(Bracket::new(
-                        BracketKind::ExternalLink(ExternalLink::new(
-                            Some("Rust"),
-                            "https://www.rust-lang.org/",
-                        )),
+                        })),
+                        Syntax::new(SyntaxKind::Bracket(Bracket::new(
+                            BracketKind::ExternalLink(ExternalLink::new(
+                                Some("Rust"),
+                                "https://www.rust-lang.org/",
+                            )),
                         ))),
-                ],
-            )],
+                    ],
+                ),
+                Line::new(
+                    LineKind::List(List::disc(1)),
+                    vec![Syntax::new(SyntaxKind::Text(Text {
+                        value: "abc".to_string(),
+                    }))],
+                ),
+            ],
         };
 
         dbg!(page);

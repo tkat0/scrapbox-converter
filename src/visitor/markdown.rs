@@ -23,17 +23,14 @@ impl Default for MarkdownPass {
 }
 
 impl Visitor for MarkdownPass {
-    fn visit_bracket_decoration(&mut self, decoration: &Decoration) -> Option<TransformCommand> {
-        let h_level = (self.h1_level + 1).saturating_sub(decoration.bold);
+    fn visit_bracket_emphasis(&mut self, emphasis: &Emphasis) -> Option<TransformCommand> {
+        let h_level = (self.h1_level + 1).saturating_sub(emphasis.bold);
         if 0 < h_level
             && h_level <= self.h1_level
-            && (self.bold_to_h || (!self.bold_to_h && decoration.bold > 1))
+            && (self.bold_to_h || (!self.bold_to_h && emphasis.bold > 1))
         {
             Some(TransformCommand::Replace(Syntax::new(SyntaxKind::Bracket(
-                Bracket::new(BracketKind::Heading(Heading::new(
-                    &decoration.text,
-                    h_level,
-                ))),
+                Bracket::new(BracketKind::Heading(Heading::new(&emphasis.text, h_level))),
             ))))
         } else {
             None
@@ -41,14 +38,28 @@ impl Visitor for MarkdownPass {
     }
 }
 
+pub struct MarkdownGenConfig {
+    indent: String,
+}
+
+impl Default for MarkdownGenConfig {
+    fn default() -> Self {
+        Self {
+            indent: "  ".to_string(),
+        }
+    }
+}
+
 pub struct MarkdownGen {
     document: String,
+    config: MarkdownGenConfig,
 }
 
 impl MarkdownGen {
-    pub fn new() -> Self {
+    pub fn new(config: MarkdownGenConfig) -> Self {
         Self {
             document: String::new(),
+            config,
         }
     }
 
@@ -61,6 +72,14 @@ impl MarkdownGen {
 impl Visitor for MarkdownGen {
     fn visit_page(&mut self, page: &mut Page) {
         for line in page.lines.iter_mut() {
+            if let LineKind::List(list) = &line.kind {
+                let indent = self.config.indent.repeat(list.level - 1);
+                match &list.kind {
+                    ListKind::Disc => self.document.push_str(&format!("{}* ", indent)),
+                    ListKind::Decimal => self.document.push_str(&format!("{}1. ", indent)),
+                    _ => {}
+                }
+            }
             self.visit_line(line);
             self.document.push_str("\n");
         }
@@ -197,36 +216,44 @@ mod test {
 
     #[test]
     fn codegen_test() {
-        let mut visitor = MarkdownGen::new();
+        let mut visitor = MarkdownGen::new(MarkdownGenConfig::default());
 
         let mut page = Page {
-            lines: vec![Line::new(
-                LineKind::Normal,
-                vec![
-                    Syntax::new(SyntaxKind::Text(Text {
-                        value: "abc ".to_string(),
-                    })),
-                    Syntax::new(SyntaxKind::HashTag(HashTag {
-                        value: "tag".to_string(),
-                    })),
-                    Syntax::new(SyntaxKind::Text(Text {
-                        value: " ".to_string(),
-                    })),
-                    Syntax::new(SyntaxKind::Bracket(Bracket::new(
-                        BracketKind::ExternalLink(ExternalLink::new(
-                            Some("Rust"),
-                            "https://www.rust-lang.org/",
-                        )),
-                    ))),
-                ],
-            )],
+            lines: vec![
+                Line::new(
+                    LineKind::Normal,
+                    vec![
+                        Syntax::new(SyntaxKind::Text(Text {
+                            value: "abc ".to_string(),
+                        })),
+                        Syntax::new(SyntaxKind::HashTag(HashTag {
+                            value: "tag".to_string(),
+                        })),
+                        Syntax::new(SyntaxKind::Text(Text {
+                            value: " ".to_string(),
+                        })),
+                        Syntax::new(SyntaxKind::Bracket(Bracket::new(
+                            BracketKind::ExternalLink(ExternalLink::new(
+                                Some("Rust"),
+                                "https://www.rust-lang.org/",
+                            )),
+                        ))),
+                    ],
+                ),
+                Line::new(
+                    LineKind::List(List::new(ListKind::Disc, 2)),
+                    vec![Syntax::new(SyntaxKind::Text(Text {
+                        value: "abc".to_string(),
+                    }))],
+                ),
+            ],
         };
 
         let markdown = visitor.generate(&mut page);
 
         assert_eq!(
             markdown,
-            "abc [#tag](tag.md) [Rust](https://www.rust-lang.org/)\n"
+            "abc [#tag](tag.md) [Rust](https://www.rust-lang.org/)\n  * abc\n"
         )
     }
 }
