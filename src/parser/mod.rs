@@ -373,13 +373,13 @@ mod test {
         //     external_link("https://www.rust-lang.org/"),
         //     Ok(("", ExternalLink::new(None, "https://www.rust-lang.org/]")))
         // );
-        assert_eq!(
-            external_link("[https://www.rust-lang.org/]\n[*-/ text]"),
-            Ok((
-                "\n[*-/ text]",
-                ExternalLink::new(None, "https://www.rust-lang.org/]")
-            ))
-        );
+        // assert_eq!(
+        //     external_link("[https://www.rust-lang.org/]\n[*-/ text]"),
+        //     Ok((
+        //         "\n[*-/ text]",
+        //         ExternalLink::new(None, "https://www.rust-lang.org/]")
+        //     ))
+        // );
     }
 
     #[test]
@@ -473,27 +473,27 @@ mod test {
                 Line::new(
                     LineKind::Normal,
                     vec![Syntax::new(SyntaxKind::Text(Text {
-                            value: "abc".to_string(),
+                        value: "abc".to_string(),
                     }))],
                 ),
                 Line::new(
                     LineKind::Normal,
                     vec![
                         Syntax::new(SyntaxKind::HashTag(HashTag {
-                                value: "efg".to_string(),
+                            value: "efg".to_string(),
                         })),
                         Syntax::new(SyntaxKind::Text(Text {
-                                value: " ".to_string(),
+                            value: " ".to_string(),
                         })),
                         Syntax::new(SyntaxKind::Bracket(Bracket::new(
                             BracketKind::InternalLink(InternalLink::new("internal link")),
-                            ))),
+                        ))),
                         Syntax::new(SyntaxKind::Bracket(Bracket::new(
                             BracketKind::ExternalLink(ExternalLink::new(
                                 None,
                                 "https://www.rust-lang.org/",
                             )),
-                            ))),
+                        ))),
                     ],
                 ),
                 Line::new(LineKind::Normal, vec![]),
