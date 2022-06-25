@@ -10,7 +10,7 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build-test:
+  build-test-deploy:
     # https://github.com/actions/virtual-environments
     # - Cargo/Rust 1.61.0
     # - Node 16.15.1
@@ -33,3 +33,5 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npm test
+      - name: Deploy to GitHub Pages
+        run: ./scripts/deploy-to-gh-pages.sh
