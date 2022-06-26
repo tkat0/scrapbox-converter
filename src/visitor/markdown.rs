@@ -139,7 +139,7 @@ impl Visitor for MarkdownGen {
         for code in &value.value {
             self.document.push_str(&format!("{}\n", code));
         }
-        self.document.push_str("```");
+        self.document.push_str("```\n");
         None
     }
 
@@ -280,6 +280,7 @@ mod test {
                 println("Hello, World!");
             }
             ```
+
             ![](https://www.rust-lang.org/static/images/rust-logo-blk.svg)
         "#};
 

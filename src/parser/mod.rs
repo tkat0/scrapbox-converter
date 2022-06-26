@@ -266,7 +266,7 @@ fn code_block(input: &str) -> Result<&str, CodeBlock> {
     let (input, file_name) = take_until("\n")(input)?;
     let (input, _) = char('\n')(input)?;
     map(
-        many0(delimited(char('\t'), take_while(|c| c != '\n'), char('\n'))),
+        many0(delimited(char(' '), take_while(|c| c != '\n'), char('\n'))),
         |codes| CodeBlock::new(file_name, codes),
     )(input)
 }
@@ -350,7 +350,7 @@ mod test {
     #[test]
     fn code_block_test() {
         assert_eq!(
-            code_block("code:hello.rs\n\t    panic!()\n\t    panic!()\n"),
+            code_block("code:hello.rs\n     panic!()\n     panic!()\n"),
             Ok((
                 "",
                 CodeBlock::new("hello.rs", vec!["    panic!()", "    panic!()"])
