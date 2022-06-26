@@ -157,12 +157,7 @@ fn internal_link(input: &str) -> Result<&str, InternalLink> {
 
 // https://www.rust-lang.org/
 fn external_link_plain(input: &str) -> Result<&str, ExternalLink> {
-    let (input, protocol) = alt((tag("https://"), tag("http://")))(input)?;
-    let (input, url) = take_until(" ")(input)?; // TODO(tkat0): zenkaku
-    Ok((
-        input,
-        ExternalLink::new(None, &format!("{}{}", protocol, url)),
-    ))
+    map(url, |s| ExternalLink::new(None, &s))(input)
 }
 
 /// [https://www.rust-lang.org/] or [https://www.rust-lang.org/ Rust] or [Rust https://www.rust-lang.org/]
@@ -171,18 +166,25 @@ fn external_link(input: &str) -> Result<&str, ExternalLink> {
 
     // [https://www.rust-lang.org/ Rust] or [https://www.rust-lang.org/]
     fn url_title(input: &str) -> Result<&str, ExternalLink> {
-        let (input, _) = space0(input)?; // TODO(tkat0): zenkaku
+        let (input, _) = space0(input)?;
         let (input, url) = url(input)?;
-        let (title, _) = space0(input)?; // TODO(tkat0): zenkaku
+        let (title, _) = space0(input)?;
         let title = if title.is_empty() { None } else { Some(title) };
         Ok(("", ExternalLink::new(title, &url)))
     }
 
     // [Rust https://www.rust-lang.org/]
+    // [Rust Rust Rust https://www.rust-lang.org/]
+    // [Rust　Rust　Rust　https://www.rust-lang.org/]
     fn title_url(input: &str) -> Result<&str, ExternalLink> {
-        let (input, title) = take_until(" ")(input)?;
+        let (input, title) = alt((
+            take_until(" https://"),
+            take_until(" http://"),
+            take_until("　https://"),
+            take_until("　http://"),
+        ))(input)?;
         let title = if title.is_empty() { None } else { Some(title) };
-        let (input, _) = space1(input)?; // TODO(tkat0): zenkaku
+        let (input, _) = space1(input)?;
         let (rest, url) = url(input)?;
         assert!(rest.is_empty());
         Ok(("", ExternalLink::new(title, &url)))
@@ -207,7 +209,7 @@ fn image(input: &str) -> Result<&str, Image> {
         return Ok((input, Image::new(&url1)));
     }
 
-    let (text, _) = space1(text)?; // TODO(tkat0): zenkaku
+    let (text, _) = space1(text)?;
 
     let (text, url2) = url(text)?;
     if text.is_empty() && is_image(&url2) {
@@ -473,6 +475,34 @@ mod test {
             Ok((
                 "",
                 ExternalLink::new(Some("Rust"), "https://www.rust-lang.org/")
+            ))
+        );
+        assert_eq!(
+            external_link("[https://www.rust-lang.org/　Rust　Rust　Rust]"),
+            Ok((
+                "",
+                ExternalLink::new(Some("Rust　Rust　Rust"), "https://www.rust-lang.org/")
+            ))
+        );
+        assert_eq!(
+            external_link("[Rust　Rust　Rust　https://www.rust-lang.org/]"),
+            Ok((
+                "",
+                ExternalLink::new(Some("Rust　Rust　Rust"), "https://www.rust-lang.org/")
+            ))
+        );
+        assert_eq!(
+            external_link("[https://www.rust-lang.org/ Rust Rust Rust]"),
+            Ok((
+                "",
+                ExternalLink::new(Some("Rust Rust Rust"), "https://www.rust-lang.org/")
+            ))
+        );
+        assert_eq!(
+            external_link("[Rust Rust Rust https://www.rust-lang.org/]"),
+            Ok((
+                "",
+                ExternalLink::new(Some("Rust Rust Rust"), "https://www.rust-lang.org/")
             ))
         );
         assert_eq!(
