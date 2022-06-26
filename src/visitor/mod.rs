@@ -56,10 +56,10 @@ pub trait Visitor {
     fn visit_expr(&mut self, value: &Expr) -> Option<TransformCommand> {
         match &value.kind {
             ExprKind::HashTag(v) => self.visit_hashtag(&v),
-            ExprKind::InternalLink(v) => self.visit_bracket_internal_link(&v),
-            ExprKind::ExternalLink(v) => self.visit_bracket_external_link(&v),
-            ExprKind::Emphasis(v) => self.visit_bracket_emphasis(&v),
-            ExprKind::Heading(v) => self.visit_bracket_heading(&v),
+            ExprKind::InternalLink(v) => self.visit_internal_link(&v),
+            ExprKind::ExternalLink(v) => self.visit_external_link(&v),
+            ExprKind::Emphasis(v) => self.visit_emphasis(&v),
+            ExprKind::Heading(v) => self.visit_heading(&v),
             ExprKind::BlockQuate(v) => self.visit_block_quate(&v),
             ExprKind::CodeBlock(v) => self.visit_code_block(&v),
             ExprKind::Text(v) => self.visit_text(&v),
@@ -70,19 +70,19 @@ pub trait Visitor {
         None
     }
 
-    fn visit_bracket_internal_link(&mut self, _value: &InternalLink) -> Option<TransformCommand> {
+    fn visit_internal_link(&mut self, _value: &InternalLink) -> Option<TransformCommand> {
         None
     }
 
-    fn visit_bracket_external_link(&mut self, _value: &ExternalLink) -> Option<TransformCommand> {
+    fn visit_external_link(&mut self, _value: &ExternalLink) -> Option<TransformCommand> {
         None
     }
 
-    fn visit_bracket_emphasis(&mut self, _value: &Emphasis) -> Option<TransformCommand> {
+    fn visit_emphasis(&mut self, _value: &Emphasis) -> Option<TransformCommand> {
         None
     }
 
-    fn visit_bracket_heading(&mut self, _value: &Heading) -> Option<TransformCommand> {
+    fn visit_heading(&mut self, _value: &Heading) -> Option<TransformCommand> {
         None
     }
 

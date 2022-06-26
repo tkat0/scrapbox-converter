@@ -82,9 +82,7 @@ fn hashtag(input: &str) -> Result<&str, HashTag> {
             tag("#"),
             take_while(move |c: char| !terminators.contains(&c.to_string().as_str())),
         ),
-        |s: &str| HashTag {
-            value: s.to_string(),
-        },
+        |s: &str| HashTag { value: s.into() },
     )(input)
 }
 
@@ -137,7 +135,7 @@ fn text(input: &str) -> Result<&str, Text> {
             }
             let input = input.split_at(consumed.len()).1;
             let text = Text {
-                value: consumed.to_string(),
+                value: consumed.into(),
             };
             return Ok((input, text));
         }
@@ -166,8 +164,6 @@ fn external_link_plain(input: &str) -> Result<&str, ExternalLink> {
 /// [https://www.rust-lang.org/] or [https://www.rust-lang.org/ Rust] or [Rust https://www.rust-lang.org/]
 fn external_link(input: &str) -> Result<&str, ExternalLink> {
     let (input, text) = delimited(char('['), take_while(|c| c != ']'), char(']'))(input)?;
-
-    dbg!(text);
 
     // [https://www.rust-lang.org/]
     fn url(input: &str) -> Result<&str, ExternalLink> {
@@ -204,8 +200,6 @@ fn external_link(input: &str) -> Result<&str, ExternalLink> {
     }
 
     let (rest, link) = alt((url_title, title_url, url))(text)?;
-    dbg!(rest);
-    dbg!(&link);
     assert!(rest.is_empty());
     Ok((input, link))
 }
@@ -302,6 +296,7 @@ fn list(input: &str) -> Result<&str, Option<List>> {
 mod test {
     #[warn(unused_imports)]
     use super::*;
+    use indoc::indoc;
 
     #[test]
     fn hashtag_test() {
@@ -512,24 +507,26 @@ mod test {
 
     #[test]
     fn page_test() {
-        let actual = page("abc\n#efg [internal link][https://www.rust-lang.org/]\n");
+        let actual = page(indoc! {"
+            abc
+            #efg [internal link][https://www.rust-lang.org/]
+        "});
+
         let expected = Page {
             lines: vec![
                 Line::new(
                     LineKind::Normal,
                     vec![Expr::new(ExprKind::Text(Text {
-                        value: "abc".to_string(),
+                        value: "abc".into(),
                     }))],
                 ),
                 Line::new(
                     LineKind::Normal,
                     vec![
                         Expr::new(ExprKind::HashTag(HashTag {
-                            value: "efg".to_string(),
+                            value: "efg".into(),
                         })),
-                        Expr::new(ExprKind::Text(Text {
-                            value: " ".to_string(),
-                        })),
+                        Expr::new(ExprKind::Text(Text { value: " ".into() })),
                         Expr::new(ExprKind::InternalLink(InternalLink::new("internal link"))),
                         Expr::new(ExprKind::ExternalLink(ExternalLink::new(
                             None,

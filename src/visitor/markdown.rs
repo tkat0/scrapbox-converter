@@ -23,7 +23,7 @@ impl Default for MarkdownPass {
 }
 
 impl Visitor for MarkdownPass {
-    fn visit_bracket_emphasis(&mut self, emphasis: &Emphasis) -> Option<TransformCommand> {
+    fn visit_emphasis(&mut self, emphasis: &Emphasis) -> Option<TransformCommand> {
         let h_level = (self.h1_level + 1).saturating_sub(emphasis.bold);
         if 0 < h_level
             && h_level <= self.h1_level
@@ -45,7 +45,7 @@ pub struct MarkdownGenConfig {
 impl Default for MarkdownGenConfig {
     fn default() -> Self {
         Self {
-            indent: "  ".to_string(),
+            indent: "  ".into(),
         }
     }
 }
@@ -90,12 +90,12 @@ impl Visitor for MarkdownGen {
         None
     }
 
-    fn visit_bracket_internal_link(&mut self, value: &InternalLink) -> Option<TransformCommand> {
+    fn visit_internal_link(&mut self, value: &InternalLink) -> Option<TransformCommand> {
         self.document.push_str(&format!("[[{}]]", value.title));
         None
     }
 
-    fn visit_bracket_external_link(&mut self, value: &ExternalLink) -> Option<TransformCommand> {
+    fn visit_external_link(&mut self, value: &ExternalLink) -> Option<TransformCommand> {
         if let Some(title) = &value.title {
             self.document
                 .push_str(&format!("[{}]({})", title, value.url));
@@ -105,7 +105,7 @@ impl Visitor for MarkdownGen {
         None
     }
 
-    fn visit_bracket_emphasis(&mut self, value: &Emphasis) -> Option<TransformCommand> {
+    fn visit_emphasis(&mut self, value: &Emphasis) -> Option<TransformCommand> {
         let mut tmp = value.text.clone();
         if value.bold > 0 {
             tmp = format!("**{}**", tmp);
@@ -120,7 +120,7 @@ impl Visitor for MarkdownGen {
         None
     }
 
-    fn visit_bracket_heading(&mut self, value: &Heading) -> Option<TransformCommand> {
+    fn visit_heading(&mut self, value: &Heading) -> Option<TransformCommand> {
         self.document.push_str(&format!(
             "{} {}",
             "#".repeat(value.level as usize),
@@ -143,8 +143,8 @@ impl Visitor for MarkdownGen {
         None
     }
 
-    fn visit_text(&mut self, text: &Text) -> Option<TransformCommand> {
-        self.document.push_str(&format!("{}", text.value));
+    fn visit_text(&mut self, value: &Text) -> Option<TransformCommand> {
+        self.document.push_str(&format!("{}", value.value));
         None
     }
 }
@@ -152,6 +152,7 @@ impl Visitor for MarkdownGen {
 mod test {
     #[warn(unused_imports)]
     use super::*;
+    use indoc::indoc;
 
     #[test]
     fn pass_test() {
@@ -230,14 +231,12 @@ mod test {
                     LineKind::Normal,
                     vec![
                         Expr::new(ExprKind::Text(Text {
-                            value: "abc ".to_string(),
+                            value: "abc ".into(),
                         })),
                         Expr::new(ExprKind::HashTag(HashTag {
-                            value: "tag".to_string(),
+                            value: "tag".into(),
                         })),
-                        Expr::new(ExprKind::Text(Text {
-                            value: " ".to_string(),
-                        })),
+                        Expr::new(ExprKind::Text(Text { value: " ".into() })),
                         Expr::new(ExprKind::ExternalLink(ExternalLink::new(
                             Some("Rust"),
                             "https://www.rust-lang.org/",
@@ -247,14 +246,14 @@ mod test {
                 Line::new(
                     LineKind::List(List::new(ListKind::Disc, 2)),
                     vec![Expr::new(ExprKind::Text(Text {
-                        value: "abc".to_string(),
+                        value: "abc".into(),
                     }))],
                 ),
                 Line::new(
                     LineKind::Normal,
                     vec![Expr::new(ExprKind::CodeBlock(CodeBlock::new(
                         "hello.rs",
-                        vec!["fn main() {", "    println(\"Hello, World!\");", "}"],
+                        vec!["fn main() {", r#"    println("Hello, World!");"#, "}"],
                     )))],
                 ),
             ],
@@ -262,9 +261,16 @@ mod test {
 
         let markdown = visitor.generate(&mut page);
 
-        assert_eq!(
-            markdown,
-            "abc #tag [Rust](https://www.rust-lang.org/)\n  * abc\n```hello.rs\nfn main() {\n    println(\"Hello, World!\");\n}\n```\n"
-        )
+        let expected = indoc! {r#"
+            abc #tag [Rust](https://www.rust-lang.org/)
+              * abc
+            ```hello.rs
+            fn main() {
+                println("Hello, World!");
+            }
+            ```
+        "#};
+
+        assert_eq!(markdown, expected)
     }
 }
