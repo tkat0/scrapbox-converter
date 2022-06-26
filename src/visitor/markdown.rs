@@ -29,8 +29,8 @@ impl Visitor for MarkdownPass {
             && h_level <= self.h1_level
             && (self.bold_to_h || (!self.bold_to_h && emphasis.bold > 1))
         {
-            Some(TransformCommand::Replace(Syntax::new(SyntaxKind::Bracket(
-                Bracket::new(BracketKind::Heading(Heading::new(&emphasis.text, h_level))),
+            Some(TransformCommand::Replace(Expr::new(ExprKind::Heading(
+                Heading::new(&emphasis.text, h_level),
             ))))
         } else {
             None
@@ -160,8 +160,8 @@ mod test {
         let mut page = Page {
             lines: vec![Line::new(
                 LineKind::Normal,
-                vec![Syntax::new(SyntaxKind::Bracket(Bracket::new(
-                    BracketKind::Emphasis(Emphasis::bold_level("text", 3)),
+                vec![Expr::new(ExprKind::Emphasis(Emphasis::bold_level(
+                    "text", 3,
                 )))],
             )],
         };
@@ -170,9 +170,7 @@ mod test {
 
         assert_eq!(
             page.lines[0].values[0],
-            Syntax::new(SyntaxKind::Bracket(Bracket::new(BracketKind::Heading(
-                Heading::new("text", 1)
-            ))))
+            Expr::new(ExprKind::Heading(Heading::new("text", 1)))
         )
     }
 
@@ -183,8 +181,8 @@ mod test {
         let mut page = Page {
             lines: vec![Line::new(
                 LineKind::Normal,
-                vec![Syntax::new(SyntaxKind::Bracket(Bracket::new(
-                    BracketKind::Emphasis(Emphasis::bold_level("text", 10)),
+                vec![Expr::new(ExprKind::Emphasis(Emphasis::bold_level(
+                    "text", 10,
                 )))],
             )],
         };
@@ -193,9 +191,7 @@ mod test {
 
         assert_eq!(
             page.lines[0].values[0],
-            Syntax::new(SyntaxKind::Bracket(Bracket::new(BracketKind::Emphasis(
-                Emphasis::bold_level("text", 10)
-            ))))
+            Expr::new(ExprKind::Emphasis(Emphasis::bold_level("text", 10)))
         )
     }
 
@@ -210,8 +206,8 @@ mod test {
         let mut page = Page {
             lines: vec![Line::new(
                 LineKind::Normal,
-                vec![Syntax::new(SyntaxKind::Bracket(Bracket::new(
-                    BracketKind::Emphasis(Emphasis::bold_level("text", 1)),
+                vec![Expr::new(ExprKind::Emphasis(Emphasis::bold_level(
+                    "text", 1,
                 )))],
             )],
         };
@@ -220,9 +216,7 @@ mod test {
 
         assert_eq!(
             page.lines[0].values[0],
-            Syntax::new(SyntaxKind::Bracket(Bracket::new(BracketKind::Heading(
-                Heading::new("text", 3)
-            ))))
+            Expr::new(ExprKind::Heading(Heading::new("text", 3)))
         )
     }
 
@@ -235,32 +229,30 @@ mod test {
                 Line::new(
                     LineKind::Normal,
                     vec![
-                        Syntax::new(SyntaxKind::Text(Text {
+                        Expr::new(ExprKind::Text(Text {
                             value: "abc ".to_string(),
                         })),
-                        Syntax::new(SyntaxKind::HashTag(HashTag {
+                        Expr::new(ExprKind::HashTag(HashTag {
                             value: "tag".to_string(),
                         })),
-                        Syntax::new(SyntaxKind::Text(Text {
+                        Expr::new(ExprKind::Text(Text {
                             value: " ".to_string(),
                         })),
-                        Syntax::new(SyntaxKind::Bracket(Bracket::new(
-                            BracketKind::ExternalLink(ExternalLink::new(
-                                Some("Rust"),
-                                "https://www.rust-lang.org/",
-                            )),
+                        Expr::new(ExprKind::ExternalLink(ExternalLink::new(
+                            Some("Rust"),
+                            "https://www.rust-lang.org/",
                         ))),
                     ],
                 ),
                 Line::new(
                     LineKind::List(List::new(ListKind::Disc, 2)),
-                    vec![Syntax::new(SyntaxKind::Text(Text {
+                    vec![Expr::new(ExprKind::Text(Text {
                         value: "abc".to_string(),
                     }))],
                 ),
                 Line::new(
                     LineKind::Normal,
-                    vec![Syntax::new(SyntaxKind::CodeBlock(CodeBlock::new(
+                    vec![Expr::new(ExprKind::CodeBlock(CodeBlock::new(
                         "hello.rs",
                         vec!["fn main() {", "    println(\"Hello, World!\");", "}"],
                     )))],

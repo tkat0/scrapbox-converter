@@ -6,11 +6,11 @@ pub struct Page {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Line {
     pub kind: LineKind,
-    pub values: Vec<Syntax>,
+    pub values: Vec<Expr>,
 }
 
 impl Line {
-    pub fn new(kind: LineKind, values: Vec<Syntax>) -> Self {
+    pub fn new(kind: LineKind, values: Vec<Expr>) -> Self {
         Self { kind, values }
     }
 }
@@ -62,21 +62,24 @@ pub enum ListKind {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Syntax {
-    pub kind: SyntaxKind,
+pub struct Expr {
+    pub kind: ExprKind,
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum SyntaxKind {
+pub enum ExprKind {
     HashTag(HashTag),
-    Bracket(Bracket),
+    InternalLink(InternalLink),
+    ExternalLink(ExternalLink),
+    Emphasis(Emphasis),
+    Heading(Heading),
     BlockQuate(BlockQuate),
     CodeBlock(CodeBlock),
     Text(Text),
 }
 
-impl Syntax {
-    pub fn new(kind: SyntaxKind) -> Self {
+impl Expr {
+    pub fn new(kind: ExprKind) -> Self {
         Self { kind }
     }
 }
@@ -92,25 +95,6 @@ impl HashTag {
             value: value.to_string(),
         }
     }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct Bracket {
-    pub kind: BracketKind,
-}
-
-impl Bracket {
-    pub fn new(kind: BracketKind) -> Self {
-        Self { kind }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum BracketKind {
-    InternalLink(InternalLink),
-    ExternalLink(ExternalLink),
-    Emphasis(Emphasis),
-    Heading(Heading),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -259,26 +243,24 @@ mod test {
                 Line::new(
                     LineKind::Normal,
                     vec![
-                        Syntax::new(SyntaxKind::Text(Text {
+                        Expr::new(ExprKind::Text(Text {
                             value: "abc".to_string(),
                         })),
-                        Syntax::new(SyntaxKind::HashTag(HashTag {
+                        Expr::new(ExprKind::HashTag(HashTag {
                             value: "tag".to_string(),
                         })),
-                        Syntax::new(SyntaxKind::Text(Text {
+                        Expr::new(ExprKind::Text(Text {
                             value: " ".to_string(),
                         })),
-                        Syntax::new(SyntaxKind::Bracket(Bracket::new(
-                            BracketKind::ExternalLink(ExternalLink::new(
-                                Some("Rust"),
-                                "https://www.rust-lang.org/",
-                            )),
+                        Expr::new(ExprKind::ExternalLink(ExternalLink::new(
+                            Some("Rust"),
+                            "https://www.rust-lang.org/",
                         ))),
                     ],
                 ),
                 Line::new(
                     LineKind::List(List::disc(1)),
-                    vec![Syntax::new(SyntaxKind::BlockQuate(BlockQuate::new("git")))],
+                    vec![Expr::new(ExprKind::BlockQuate(BlockQuate::new("git")))],
                 ),
             ],
         };

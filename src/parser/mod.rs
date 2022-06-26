@@ -36,14 +36,14 @@ fn line(input: &str) -> Result<&str, Line> {
     let (input, list) = list(input)?;
 
     if let Some(list) = &list {
-        map(many0(syntax), |c| {
+        map(many0(expr), |c| {
             Line::new(
                 LineKind::List(list.clone()),
                 c.into_iter().filter_map(identity).collect(),
             )
         })(input)
     } else {
-        map(many0(syntax), |c| {
+        map(many0(expr), |c| {
             Line::new(
                 LineKind::Normal,
                 c.into_iter().filter_map(identity).collect(),
@@ -52,19 +52,19 @@ fn line(input: &str) -> Result<&str, Line> {
     }
 }
 
-fn syntax(input: &str) -> Result<&str, Option<Syntax>> {
+fn expr(input: &str) -> Result<&str, Option<Expr>> {
     map(
         alt((
-            map(hashtag, |s| Syntax::new(SyntaxKind::HashTag(s))),
-            map(block_quate, |s| Syntax::new(SyntaxKind::BlockQuate(s))),
-            map(code_block, |s| Syntax::new(SyntaxKind::CodeBlock(s))),
-            map(bracketing, |s| Syntax::new(SyntaxKind::Bracket(s))),
+            map(hashtag, |s| Expr::new(ExprKind::HashTag(s))),
+            map(block_quate, |s| Expr::new(ExprKind::BlockQuate(s))),
+            map(code_block, |s| Expr::new(ExprKind::CodeBlock(s))),
+            map(emphasis, |c| Expr::new(ExprKind::Emphasis(c))),
+            map(external_link, |c| Expr::new(ExprKind::ExternalLink(c))),
+            map(internal_link, |c| Expr::new(ExprKind::InternalLink(c))),
             map(external_link_plain, |s| {
-                Syntax::new(SyntaxKind::Bracket(Bracket::new(
-                    BracketKind::ExternalLink(s),
-                )))
+                Expr::new(ExprKind::ExternalLink(s))
             }),
-            map(text, |s| Syntax::new(SyntaxKind::Text(s))),
+            map(text, |s| Expr::new(ExprKind::Text(s))),
         )),
         Some,
     )(input)
@@ -145,19 +145,6 @@ fn text(input: &str) -> Result<&str, Text> {
             return Err(Err::Error(VerboseError::from_char(input, ' ')));
         }
     }
-}
-
-/// []
-fn bracketing(input: &str) -> Result<&str, Bracket> {
-    let (input, _) = peek(delimited(char('['), take_while(|c| c != ']'), char(']')))(input)?;
-    map(
-        alt((
-            map(emphasis, |c| BracketKind::Emphasis(c)),
-            map(external_link, |c| BracketKind::ExternalLink(c)),
-            map(internal_link, |c| BracketKind::InternalLink(c)),
-        )),
-        |kind| Bracket::new(kind),
-    )(input)
 }
 
 // [internal link]
@@ -467,50 +454,26 @@ mod test {
     }
 
     #[test]
-    fn bracketing_test() {
+    fn expr_test() {
+        assert!(expr("").is_err());
+        assert!(expr("\n").is_err());
         assert_eq!(
-            bracketing("[title]"),
-            Ok((
-                "",
-                Bracket::new(BracketKind::InternalLink(InternalLink::new("title")))
-            ))
+            expr("abc #tag "),
+            Ok(("#tag ", Some(Expr::new(ExprKind::Text(Text::new("abc "))))))
         );
         assert_eq!(
-            bracketing("[https://www.rust-lang.org/]"),
-            Ok((
-                "",
-                Bracket::new(BracketKind::ExternalLink(ExternalLink::new(
-                    None,
-                    "https://www.rust-lang.org/"
-                )))
-            ))
-        );
-    }
-
-    #[test]
-    fn syntax_test() {
-        assert!(syntax("").is_err());
-        assert!(syntax("\n").is_err());
-        assert_eq!(
-            syntax("abc #tag "),
-            Ok((
-                "#tag ",
-                Some(Syntax::new(SyntaxKind::Text(Text::new("abc "))))
-            ))
-        );
-        assert_eq!(
-            syntax("#tag abc"),
+            expr("#tag abc"),
             Ok((
                 " abc",
-                Some(Syntax::new(SyntaxKind::HashTag(HashTag::new("tag"))))
+                Some(Expr::new(ExprKind::HashTag(HashTag::new("tag"))))
             ))
         );
         assert_eq!(
-            syntax("[title]abc"),
+            expr("[title]abc"),
             Ok((
                 "abc",
-                Some(Syntax::new(SyntaxKind::Bracket(Bracket::new(
-                    BracketKind::InternalLink(InternalLink::new("title"))
+                Some(Expr::new(ExprKind::InternalLink(InternalLink::new(
+                    "title"
                 ))))
             ))
         );
@@ -525,7 +488,7 @@ mod test {
                 "",
                 Line::new(
                     LineKind::Normal,
-                    vec![Syntax::new(SyntaxKind::Text(Text::new(" ")))]
+                    vec![Expr::new(ExprKind::Text(Text::new(" ")))]
                 ),
             ))
         );
@@ -536,13 +499,11 @@ mod test {
                 Line::new(
                     LineKind::Normal,
                     vec![
-                        Syntax::new(SyntaxKind::HashTag(HashTag::new("tag"))),
-                        Syntax::new(SyntaxKind::Text(Text::new(" "))),
-                        Syntax::new(SyntaxKind::HashTag(HashTag::new("tag"))),
-                        Syntax::new(SyntaxKind::Text(Text::new(" "))),
-                        Syntax::new(SyntaxKind::Bracket(Bracket::new(
-                            BracketKind::InternalLink(InternalLink::new("internal link"))
-                        ))),
+                        Expr::new(ExprKind::HashTag(HashTag::new("tag"))),
+                        Expr::new(ExprKind::Text(Text::new(" "))),
+                        Expr::new(ExprKind::HashTag(HashTag::new("tag"))),
+                        Expr::new(ExprKind::Text(Text::new(" "))),
+                        Expr::new(ExprKind::InternalLink(InternalLink::new("internal link"))),
                     ]
                 )
             ))
@@ -556,27 +517,23 @@ mod test {
             lines: vec![
                 Line::new(
                     LineKind::Normal,
-                    vec![Syntax::new(SyntaxKind::Text(Text {
+                    vec![Expr::new(ExprKind::Text(Text {
                         value: "abc".to_string(),
                     }))],
                 ),
                 Line::new(
                     LineKind::Normal,
                     vec![
-                        Syntax::new(SyntaxKind::HashTag(HashTag {
+                        Expr::new(ExprKind::HashTag(HashTag {
                             value: "efg".to_string(),
                         })),
-                        Syntax::new(SyntaxKind::Text(Text {
+                        Expr::new(ExprKind::Text(Text {
                             value: " ".to_string(),
                         })),
-                        Syntax::new(SyntaxKind::Bracket(Bracket::new(
-                            BracketKind::InternalLink(InternalLink::new("internal link")),
-                        ))),
-                        Syntax::new(SyntaxKind::Bracket(Bracket::new(
-                            BracketKind::ExternalLink(ExternalLink::new(
-                                None,
-                                "https://www.rust-lang.org/",
-                            )),
+                        Expr::new(ExprKind::InternalLink(InternalLink::new("internal link"))),
+                        Expr::new(ExprKind::ExternalLink(ExternalLink::new(
+                            None,
+                            "https://www.rust-lang.org/",
                         ))),
                     ],
                 ),

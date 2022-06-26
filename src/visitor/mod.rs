@@ -6,9 +6,9 @@ pub mod markdown;
 
 #[derive(Debug)]
 pub enum TransformCommand {
-    /// Replace the current syntax with the specified syntax.
-    Replace(Syntax),
-    /// Delete the current syntax.
+    /// Replace the current expr with the specified expr.
+    Replace(Expr),
+    /// Delete the current expr.
     Delete,
 }
 
@@ -24,10 +24,10 @@ pub trait Visitor {
     }
 
     fn visit_line(&mut self, value: &mut Line) {
-        // Execute all syntaxes' commands
+        // Execute all expres' commands
         let mut commands = HashMap::new();
         for (i, item) in value.values.iter().enumerate() {
-            let command = self.visit_syntax(item);
+            let command = self.visit_expr(item);
             if let Some(c) = command {
                 commands.insert(i, c);
             }
@@ -53,27 +53,21 @@ pub trait Visitor {
         });
     }
 
-    fn visit_syntax(&mut self, value: &Syntax) -> Option<TransformCommand> {
+    fn visit_expr(&mut self, value: &Expr) -> Option<TransformCommand> {
         match &value.kind {
-            SyntaxKind::HashTag(v) => self.visit_hashtag(&v),
-            SyntaxKind::Bracket(v) => self.visit_bracket(&v),
-            SyntaxKind::BlockQuate(v) => self.visit_block_quate(&v),
-            SyntaxKind::CodeBlock(v) => self.visit_code_block(&v),
-            SyntaxKind::Text(v) => self.visit_text(&v),
+            ExprKind::HashTag(v) => self.visit_hashtag(&v),
+            ExprKind::InternalLink(v) => self.visit_bracket_internal_link(&v),
+            ExprKind::ExternalLink(v) => self.visit_bracket_external_link(&v),
+            ExprKind::Emphasis(v) => self.visit_bracket_emphasis(&v),
+            ExprKind::Heading(v) => self.visit_bracket_heading(&v),
+            ExprKind::BlockQuate(v) => self.visit_block_quate(&v),
+            ExprKind::CodeBlock(v) => self.visit_code_block(&v),
+            ExprKind::Text(v) => self.visit_text(&v),
         }
     }
 
     fn visit_hashtag(&mut self, _value: &HashTag) -> Option<TransformCommand> {
         None
-    }
-
-    fn visit_bracket(&mut self, value: &Bracket) -> Option<TransformCommand> {
-        match &value.kind {
-            BracketKind::InternalLink(v) => self.visit_bracket_internal_link(&v),
-            BracketKind::ExternalLink(v) => self.visit_bracket_external_link(&v),
-            BracketKind::Emphasis(v) => self.visit_bracket_emphasis(&v),
-            BracketKind::Heading(v) => self.visit_bracket_heading(&v),
-        }
     }
 
     fn visit_bracket_internal_link(&mut self, _value: &InternalLink) -> Option<TransformCommand> {
