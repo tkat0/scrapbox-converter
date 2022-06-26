@@ -2,6 +2,7 @@ import {
   Box,
   Flex,
   Heading,
+  IconButton,
   Link,
   Tab,
   TabList,
@@ -9,8 +10,9 @@ import {
   TabPanels,
   Tabs,
   Textarea,
+  Tooltip,
 } from "@chakra-ui/react";
-import { ArrowForwardIcon, ExternalLinkIcon } from "@chakra-ui/icons";
+import { ArrowForwardIcon, CopyIcon, ExternalLinkIcon } from "@chakra-ui/icons";
 import React, { useEffect, useState } from "react";
 
 import { scrapboxToMarkdown } from "../main";
@@ -18,6 +20,7 @@ import { ConfigModal, defaultConfig } from "./ConfigModal";
 import { defaultData } from "./data";
 import { Header } from "./Header";
 import { Preview } from "./Preview";
+import { getQuery, copyQuery } from "./query";
 
 interface FormProps {
   value: string;
@@ -37,7 +40,7 @@ const Form = (props: FormProps) => {
 };
 
 function App() {
-  const [src, setSrc] = useState(defaultData);
+  const [src, setSrc] = useState(getQuery() ?? defaultData);
   const [dst, setDst] = useState(src);
   const [config, setConfig] = useState(defaultConfig);
 
@@ -49,7 +52,12 @@ function App() {
   }, [src, config]);
 
   const onChange = async (event: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setSrc(event.target.value);
+    const src = event.target.value;
+    setSrc(src);
+  };
+
+  const onCopyClick = () => {
+    copyQuery(src);
   };
 
   return (
@@ -70,6 +78,14 @@ function App() {
           <Tabs display="flex" isFitted h="100%" flexDirection="column">
             <TabList mb="1em" maxH="40px">
               <Tab>Scrapbox</Tab>
+              <Tooltip label="Copy URL to Clipboard">
+                <IconButton
+                  aria-label="Copy URL to Clipboard"
+                  size="sm"
+                  icon={<CopyIcon />}
+                  onClick={onCopyClick}
+                />
+              </Tooltip>
             </TabList>
             <TabPanels flexGrow={1}>
               <TabPanel p="0" h="100%">

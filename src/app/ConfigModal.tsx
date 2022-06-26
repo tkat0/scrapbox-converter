@@ -152,8 +152,12 @@ function ConfigRow<T>(props: ConfigRowProps<T>) {
     <Flex alignItems={"center"} gap={"2"} m="2">
       <Box>
         <Heading size="sm">{title}</Heading>
-        {descriptions.map((d) => {
-          return <Text fontSize={"sm"}>{d}</Text>;
+        {descriptions.map((d, i) => {
+          return (
+            <Text key={i} fontSize={"sm"}>
+              {d}
+            </Text>
+          );
         })}
       </Box>
       <Spacer />
