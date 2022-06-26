@@ -15,7 +15,7 @@ import {
 import { ArrowForwardIcon, CopyIcon, ExternalLinkIcon } from "@chakra-ui/icons";
 import React, { useEffect, useState } from "react";
 
-import { scrapboxToMarkdown } from "../main";
+import { useScrapboxToMarkdown, scrapboxToMarkdown } from "../main";
 import { ConfigModal, defaultConfig } from "./ConfigModal";
 import { defaultData } from "./data";
 import { Header } from "./Header";
@@ -40,16 +40,16 @@ const Form = (props: FormProps) => {
 };
 
 function App() {
+  const initialized = useScrapboxToMarkdown();
   const [src, setSrc] = useState(getQuery() ?? defaultData);
   const [dst, setDst] = useState(src);
   const [config, setConfig] = useState(defaultConfig);
 
   useEffect(() => {
-    (async () => {
-      const dst = await scrapboxToMarkdown(src, config);
-      setDst(dst);
-    })();
-  }, [src, config]);
+    if (!initialized) return;
+    const dst = scrapboxToMarkdown(src, config);
+    setDst(dst);
+  }, [initialized, src, config]);
 
   const onChange = async (event: React.ChangeEvent<HTMLTextAreaElement>) => {
     const src = event.target.value;
