@@ -75,6 +75,7 @@ pub enum ExprKind {
     Heading(Heading),
     BlockQuate(BlockQuate),
     CodeBlock(CodeBlock),
+    Image(Image),
     Text(Text),
 }
 
@@ -232,8 +233,19 @@ impl Emphasis {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct Image {
+    pub uri: String,
+}
+
+impl Image {
+    pub fn new(uri: &str) -> Self {
+        Self { uri: uri.into() }
+    }
+}
+
+#[cfg(test)]
 mod test {
-    #[warn(unused_imports)]
     use super::*;
 
     #[test]

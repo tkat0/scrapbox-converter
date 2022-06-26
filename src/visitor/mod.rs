@@ -62,6 +62,7 @@ pub trait Visitor {
             ExprKind::Heading(v) => self.visit_heading(&v),
             ExprKind::BlockQuate(v) => self.visit_block_quate(&v),
             ExprKind::CodeBlock(v) => self.visit_code_block(&v),
+            ExprKind::Image(v) => self.visit_image(&v),
             ExprKind::Text(v) => self.visit_text(&v),
         }
     }
@@ -91,6 +92,10 @@ pub trait Visitor {
     }
 
     fn visit_code_block(&mut self, _value: &CodeBlock) -> Option<TransformCommand> {
+        None
+    }
+
+    fn visit_image(&mut self, _value: &Image) -> Option<TransformCommand> {
         None
     }
 

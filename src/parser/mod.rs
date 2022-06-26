@@ -58,8 +58,10 @@ fn expr(input: &str) -> Result<&str, Option<Expr>> {
             map(hashtag, |s| Expr::new(ExprKind::HashTag(s))),
             map(block_quate, |s| Expr::new(ExprKind::BlockQuate(s))),
             map(code_block, |s| Expr::new(ExprKind::CodeBlock(s))),
+            map(image, |s| Expr::new(ExprKind::Image(s))),
             map(emphasis, |c| Expr::new(ExprKind::Emphasis(c))),
             map(external_link, |c| Expr::new(ExprKind::ExternalLink(c))),
+            // NOTE(tkat0): keep internal_link at the bottom of parsing bracket expr
             map(internal_link, |c| Expr::new(ExprKind::InternalLink(c))),
             map(external_link_plain, |s| {
                 Expr::new(ExprKind::ExternalLink(s))
@@ -147,7 +149,7 @@ fn text(input: &str) -> Result<&str, Text> {
 
 // [internal link]
 fn internal_link(input: &str) -> Result<&str, InternalLink> {
-    let (input, text) = delimited(char('['), take_while(|c| c != ']'), char(']'))(input)?;
+    let (input, text) = bracket(input)?;
     Ok((input, InternalLink::new(text)))
 }
 
@@ -163,28 +165,15 @@ fn external_link_plain(input: &str) -> Result<&str, ExternalLink> {
 
 /// [https://www.rust-lang.org/] or [https://www.rust-lang.org/ Rust] or [Rust https://www.rust-lang.org/]
 fn external_link(input: &str) -> Result<&str, ExternalLink> {
-    let (input, text) = delimited(char('['), take_while(|c| c != ']'), char(']'))(input)?;
+    let (input, text) = bracket(input)?;
 
-    // [https://www.rust-lang.org/]
-    fn url(input: &str) -> Result<&str, ExternalLink> {
-        let (input, _) = space0(input)?; // TODO(tkat0): zenkaku
-        let (url, protocol) = alt((tag("https://"), tag("http://")))(input)?;
-        Ok((
-            "",
-            ExternalLink::new(None, &format!("{}{}", protocol, url.trim())),
-        ))
-    }
-
-    // [https://www.rust-lang.org/ Rust]
+    // [https://www.rust-lang.org/ Rust] or [https://www.rust-lang.org/]
     fn url_title(input: &str) -> Result<&str, ExternalLink> {
-        let (input, protocol) = alt((tag("https://"), tag("http://")))(input)?;
-        let (input, url) = take_until(" ")(input)?;
-        let (title, _) = space1(input)?; // TODO(tkat0): zenkaku
+        let (input, _) = space0(input)?; // TODO(tkat0): zenkaku
+        let (input, url) = url(input)?;
+        let (title, _) = space0(input)?; // TODO(tkat0): zenkaku
         let title = if title.is_empty() { None } else { Some(title) };
-        Ok((
-            "",
-            ExternalLink::new(title, &format!("{}{}", protocol, url)),
-        ))
+        Ok(("", ExternalLink::new(title, &url)))
     }
 
     // [Rust https://www.rust-lang.org/]
@@ -192,20 +181,60 @@ fn external_link(input: &str) -> Result<&str, ExternalLink> {
         let (input, title) = take_until(" ")(input)?;
         let title = if title.is_empty() { None } else { Some(title) };
         let (input, _) = space1(input)?; // TODO(tkat0): zenkaku
-        let (url, protocol) = alt((tag("https://"), tag("http://")))(input)?;
-        Ok((
-            "",
-            ExternalLink::new(title, &format!("{}{}", protocol, url.trim())),
-        ))
+        let (rest, url) = url(input)?;
+        assert!(rest.is_empty());
+        Ok(("", ExternalLink::new(title, &url)))
     }
 
-    let (rest, link) = alt((url_title, title_url, url))(text)?;
+    let (rest, link) = alt((url_title, title_url))(text)?;
     assert!(rest.is_empty());
     Ok((input, link))
 }
 
 /// [http://cutedog.com https://i.gyazo.com/da78df293f9e83a74b5402411e2f2e01.png]
-fn image() {}
+/// [https://i.gyazo.com/da78df293f9e83a74b5402411e2f2e01.png]
+fn image(input: &str) -> Result<&str, Image> {
+    let ext = ["svg", "jpg", "jpeg", "png", "gif"];
+    let (input, text) = bracket(input)?;
+    let (text, url1) = url(text)?;
+
+    let is_image = |url: &str| ext.iter().any(|e| url.ends_with(e));
+
+    dbg!(&url1);
+    dbg!(text);
+
+    if text.is_empty() && is_image(&url1) {
+        // [https://i.gyazo.com/da78df293f9e83a74b5402411e2f2e01.png]
+        return Ok((input, Image::new(&url1)));
+    }
+
+    let (text, _) = space1(text)?; // TODO(tkat0): zenkaku
+
+    let (text, url2) = url(text)?;
+    dbg!(&url2);
+    dbg!(text);
+    if text.is_empty() && is_image(&url2) {
+        // [http://cutedog.com https://i.gyazo.com/da78df293f9e83a74b5402411e2f2e01.png]
+        return Ok((input, Image::new(&url2)));
+    } else {
+        Err(Err::Error(VerboseError::from_char(input, ' ')))
+    }
+}
+
+fn url(input: &str) -> Result<&str, String> {
+    let (url, protocol) = alt((tag("https://"), tag("http://")))(input)?;
+
+    fn is_token(c: char) -> bool {
+        match c as u8 {
+            33..=126 => true,
+            _ => false,
+        }
+    }
+
+    let (rest, url) = take_while(|c| is_token(c))(url)?;
+
+    Ok((rest, format!("{}{}", protocol, url)))
+}
 
 /// [/icons/todo.icon]
 fn icon() {}
@@ -215,7 +244,7 @@ fn icon() {}
 /// [/ italic]
 /// [- strikethrough]
 fn emphasis(input: &str) -> Result<&str, Emphasis> {
-    let (input, text) = delimited(char('['), take_while(|c| c != ']'), char(']'))(input)?;
+    let (input, text) = bracket(input)?;
 
     let (rest, tokens) = take_while(|c| ['*', '/', '-'].contains(&c))(text)?;
     let (text, _) = char(' ')(rest)?;
@@ -293,10 +322,34 @@ fn list(input: &str) -> Result<&str, Option<List>> {
     }
 }
 
+// [abc]
+fn bracket(input: &str) -> Result<&str, &str> {
+    delimited(char('['), take_while(|c| c != ']'), char(']'))(input)
+}
+
+#[cfg(test)]
 mod test {
-    #[warn(unused_imports)]
     use super::*;
     use indoc::indoc;
+
+    #[test]
+    fn bracket_test() {
+        assert_eq!(bracket("[]"), Ok(("", "")));
+        assert_eq!(bracket("[abc]def"), Ok(("def", "abc")));
+        assert_eq!(bracket("[ab]c]def"), Ok(("c]def", "ab")));
+    }
+
+    #[test]
+    fn url_test() {
+        assert_eq!(
+            url("https://www.rust-lang.org"),
+            Ok(("", "https://www.rust-lang.org".into()))
+        );
+        assert_eq!(
+            url("https://www.rust-lang.org abc"),
+            Ok((" abc", "https://www.rust-lang.org".into()))
+        );
+    }
 
     #[test]
     fn hashtag_test() {
@@ -341,6 +394,25 @@ mod test {
             Ok((
                 "",
                 CodeBlock::new("hello.rs", vec!["    panic!()", "    panic!()"])
+            ))
+        );
+    }
+
+    #[test]
+    fn image_test() {
+        assert_eq!(
+            image("[https://www.rust-lang.org/static/images/rust-logo-blk.svg]"),
+            Ok((
+                "",
+                Image::new("https://www.rust-lang.org/static/images/rust-logo-blk.svg")
+            ))
+        );
+        // TODO(tkat0): enable link
+        assert_eq!(
+            image("[https://www.rust-lang.org/ https://www.rust-lang.org/static/images/rust-logo-blk.svg]"),
+            Ok((
+                "",
+                Image::new("https://www.rust-lang.org/static/images/rust-logo-blk.svg")
             ))
         );
     }

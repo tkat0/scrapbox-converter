@@ -38,6 +38,10 @@ And then, It is compiled into WebAssembly and run in the browser without sending
 \t[https://scrapbox.io Scrapbox]
 \t[https://scrapbox.io]
 
+[** Image]
+\t[https://www.rust-lang.org/static/images/rust-logo-blk.svg]
+\t[https://www.rust-lang.org/ https://www.rust-lang.org/static/images/rust-logo-blk.svg]
+
 [** Code block]
 code:hello.rs
 \tfn main() {

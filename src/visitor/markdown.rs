@@ -143,14 +143,19 @@ impl Visitor for MarkdownGen {
         None
     }
 
+    fn visit_image(&mut self, value: &Image) -> Option<TransformCommand> {
+        self.document.push_str(&format!("![]({})", value.uri));
+        None
+    }
+
     fn visit_text(&mut self, value: &Text) -> Option<TransformCommand> {
         self.document.push_str(&format!("{}", value.value));
         None
     }
 }
 
+#[cfg(test)]
 mod test {
-    #[warn(unused_imports)]
     use super::*;
     use indoc::indoc;
 
@@ -256,6 +261,12 @@ mod test {
                         vec!["fn main() {", r#"    println("Hello, World!");"#, "}"],
                     )))],
                 ),
+                Line::new(
+                    LineKind::Normal,
+                    vec![Expr::new(ExprKind::Image(Image::new(
+                        "https://www.rust-lang.org/static/images/rust-logo-blk.svg",
+                    )))],
+                ),
             ],
         };
 
@@ -269,6 +280,7 @@ mod test {
                 println("Hello, World!");
             }
             ```
+            ![](https://www.rust-lang.org/static/images/rust-logo-blk.svg)
         "#};
 
         assert_eq!(markdown, expected)
