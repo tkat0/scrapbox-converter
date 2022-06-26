@@ -1,5 +1,7 @@
 # Scrapbox Converter
 
+![](https://github.com/tkat0/scrapbox-converter/actions/workflows/ci.yml/badge.svg?branch=main)
+
 [Scrapbox](https://scrapbox.io/) converter written in Rust
 
 This is a hobby project to import Scrapbox to [Obsidian](https://obsidian.md/).
