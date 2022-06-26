@@ -25,12 +25,12 @@ import {
 import React from "react";
 
 export interface Config {
-  heading1LevelMapping: number;
+  heading1Mapping: number;
   boldToHeading: boolean;
 }
 
 export const defaultConfig: Config = {
-  heading1LevelMapping: 3,
+  heading1Mapping: 4,
   boldToHeading: false,
 };
 
@@ -46,7 +46,9 @@ export const ConfigModal: React.FC<ConfigModalProps> = (props) => {
 
   return (
     <>
-      <Button onClick={onOpen}>Configuration</Button>
+      <Button onClick={onOpen} size="sm">
+        Configuration
+      </Button>
 
       <Modal onClose={onClose} isOpen={isOpen} isCentered size={"2xl"}>
         <ModalOverlay />
@@ -55,10 +57,10 @@ export const ConfigModal: React.FC<ConfigModalProps> = (props) => {
           <ModalCloseButton />
           <ModalBody>
             <ConfigHeader
-              value={config.heading1LevelMapping}
-              defaultValue={defaultConfig.heading1LevelMapping}
+              value={config.heading1Mapping}
+              defaultValue={defaultConfig.heading1Mapping}
               setValue={(value) => {
-                setConfig({ ...config, heading1LevelMapping: value });
+                setConfig({ ...config, heading1Mapping: value });
               }}
             />
             <Divider />
@@ -89,7 +91,7 @@ function ConfigHeader(props: ConfigProps<number>) {
   const { value, setValue, defaultValue } = props;
   return (
     <ConfigRow
-      title={"Heading1 Level Mapping"}
+      title={"Heading1 Mapping"}
       descriptions={[`[${"*".repeat(value)} heading] → # heading1`]}
       defaultValue={defaultValue}
       setValue={setValue}
@@ -100,7 +102,10 @@ function ConfigHeader(props: ConfigProps<number>) {
         max={5}
         size="sm"
         onChange={(value) => {
-          setValue(parseInt(value));
+          const v = parseInt(value);
+          if (1 <= v && v <= 5) {
+            setValue(parseInt(value));
+          }
         }}
       >
         <NumberInputField size={1} />

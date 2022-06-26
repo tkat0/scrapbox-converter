@@ -1,11 +1,23 @@
-import { Box, Flex, Heading, Link, Textarea } from "@chakra-ui/react";
-import { ExternalLinkIcon } from "@chakra-ui/icons";
+import {
+  Box,
+  Flex,
+  Heading,
+  Link,
+  Tab,
+  TabList,
+  TabPanel,
+  TabPanels,
+  Tabs,
+  Textarea,
+} from "@chakra-ui/react";
+import { ArrowForwardIcon, ExternalLinkIcon } from "@chakra-ui/icons";
 import React, { useEffect, useState } from "react";
 
 import { scrapboxToMarkdown } from "../main";
 import { ConfigModal, defaultConfig } from "./ConfigModal";
 import { defaultData } from "./data";
 import { Header } from "./Header";
+import { Preview } from "./Preview";
 
 interface FormProps {
   value: string;
@@ -19,7 +31,7 @@ const Form = (props: FormProps) => {
       value={value}
       onChange={onChange}
       isReadOnly={onChange === undefined}
-      h="600px"
+      h="100%"
     />
   );
 };
@@ -41,7 +53,7 @@ function App() {
   };
 
   return (
-    <Box m="8">
+    <Flex p="2" w="100vw" h="100vh" direction="column">
       <Header />
       <Heading mb="2">Scrapbox To Markdown Converter (alpha)</Heading>
       <Box m="2">
@@ -53,21 +65,40 @@ function App() {
       <Box m="2">
         <ConfigModal config={config} setConfig={setConfig} />
       </Box>
-      <Flex>
+      <Flex alignItems="stretch" flexGrow={1}>
         <Box flex="1" m="2">
-          <Heading size="md" mb="2">
-            Scrapbox
-          </Heading>
-          <Form value={src} onChange={onChange} />
+          <Tabs display="flex" isFitted h="100%" flexDirection="column">
+            <TabList mb="1em" maxH="40px">
+              <Tab>Scrapbox</Tab>
+            </TabList>
+            <TabPanels flexGrow={1}>
+              <TabPanel p="0" h="100%">
+                <Form value={src} onChange={onChange} />
+              </TabPanel>
+            </TabPanels>
+          </Tabs>
+        </Box>
+        <Box>
+          <ArrowForwardIcon mt="4" />
         </Box>
         <Box flex="1" m="2">
-          <Heading size="md" mb="2">
-            Markdown (read only)
-          </Heading>
-          <Form value={dst} />
+          <Tabs display="flex" isFitted h="100%" flexDirection="column">
+            <TabList mb="1em" maxH="40px">
+              <Tab>Markdown</Tab>
+              <Tab>HTML</Tab>
+            </TabList>
+            <TabPanels flexGrow={1}>
+              <TabPanel p="0" h="100%">
+                <Form value={dst} />
+              </TabPanel>
+              <TabPanel p="0" h="100%">
+                <Preview markdown={dst} />
+              </TabPanel>
+            </TabPanels>
+          </Tabs>
         </Box>
       </Flex>
-    </Box>
+    </Flex>
   );
 }
 
