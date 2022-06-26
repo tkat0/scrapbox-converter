@@ -5,6 +5,7 @@ import React, { useEffect, useState } from "react";
 import { scrapboxToMarkdown } from "../main";
 import { ConfigModal, defaultConfig } from "./ConfigModal";
 import { defaultData } from "./data";
+import { Header } from "./Header";
 
 interface FormProps {
   value: string;
@@ -41,6 +42,7 @@ function App() {
 
   return (
     <Box m="8">
+      <Header />
       <Heading mb="2">Scrapbox To Markdown Converter (alpha)</Heading>
       <Box m="2">
         <Link href="https://github.com/tkat0/scrapbox-converter" isExternal>
