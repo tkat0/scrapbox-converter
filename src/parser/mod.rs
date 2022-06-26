@@ -1,11 +1,10 @@
 use std::convert::identity;
 
-use nom::character::complete::{char, digit1, space0, space1};
+use nom::character::complete::{char, digit1};
 use nom::combinator::{opt, peek};
 use nom::error::{ParseError, VerboseError};
 use nom::multi::many1;
 use nom::sequence::terminated;
-use nom::IResult;
 use nom::{
     branch::alt,
     bytes::complete::{tag, take_until, take_while},
@@ -17,7 +16,10 @@ use nom::{
 
 use crate::ast::*;
 
-pub type Result<I, O, E = VerboseError<I>> = IResult<I, O, E>;
+mod error;
+mod utils;
+use error::*;
+use utils::*;
 
 pub fn page(input: &str) -> Result<&str, Page> {
     let (input, lines) = many0(line)(input)?;
@@ -200,9 +202,6 @@ fn image(input: &str) -> Result<&str, Image> {
 
     let is_image = |url: &str| ext.iter().any(|e| url.ends_with(e));
 
-    dbg!(&url1);
-    dbg!(text);
-
     if text.is_empty() && is_image(&url1) {
         // [https://i.gyazo.com/da78df293f9e83a74b5402411e2f2e01.png]
         return Ok((input, Image::new(&url1)));
@@ -211,29 +210,12 @@ fn image(input: &str) -> Result<&str, Image> {
     let (text, _) = space1(text)?; // TODO(tkat0): zenkaku
 
     let (text, url2) = url(text)?;
-    dbg!(&url2);
-    dbg!(text);
     if text.is_empty() && is_image(&url2) {
         // [http://cutedog.com https://i.gyazo.com/da78df293f9e83a74b5402411e2f2e01.png]
         return Ok((input, Image::new(&url2)));
     } else {
         Err(Err::Error(VerboseError::from_char(input, ' ')))
     }
-}
-
-fn url(input: &str) -> Result<&str, String> {
-    let (url, protocol) = alt((tag("https://"), tag("http://")))(input)?;
-
-    fn is_token(c: char) -> bool {
-        match c as u8 {
-            33..=126 => true,
-            _ => false,
-        }
-    }
-
-    let (rest, url) = take_while(|c| is_token(c))(url)?;
-
-    Ok((rest, format!("{}{}", protocol, url)))
 }
 
 /// [/icons/todo.icon]
@@ -322,34 +304,10 @@ fn list(input: &str) -> Result<&str, Option<List>> {
     }
 }
 
-// [abc]
-fn bracket(input: &str) -> Result<&str, &str> {
-    delimited(char('['), take_while(|c| c != ']'), char(']'))(input)
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
     use indoc::indoc;
-
-    #[test]
-    fn bracket_test() {
-        assert_eq!(bracket("[]"), Ok(("", "")));
-        assert_eq!(bracket("[abc]def"), Ok(("def", "abc")));
-        assert_eq!(bracket("[ab]c]def"), Ok(("c]def", "ab")));
-    }
-
-    #[test]
-    fn url_test() {
-        assert_eq!(
-            url("https://www.rust-lang.org"),
-            Ok(("", "https://www.rust-lang.org".into()))
-        );
-        assert_eq!(
-            url("https://www.rust-lang.org abc"),
-            Ok((" abc", "https://www.rust-lang.org".into()))
-        );
-    }
 
     #[test]
     fn hashtag_test() {
@@ -410,6 +368,13 @@ mod test {
         // TODO(tkat0): enable link
         assert_eq!(
             image("[https://www.rust-lang.org/ https://www.rust-lang.org/static/images/rust-logo-blk.svg]"),
+            Ok((
+                "",
+                Image::new("https://www.rust-lang.org/static/images/rust-logo-blk.svg")
+            ))
+        );
+        assert_eq!(
+            image("[https://www.rust-lang.org/　https://www.rust-lang.org/static/images/rust-logo-blk.svg]"),
             Ok((
                 "",
                 Image::new("https://www.rust-lang.org/static/images/rust-logo-blk.svg")
@@ -510,12 +475,29 @@ mod test {
                 ExternalLink::new(Some("Rust"), "https://www.rust-lang.org/")
             ))
         );
-        // assert!(external_link("[ https://www.rust-lang.org/ Rust ]").is_err());
         assert_eq!(
             external_link("[https://www.rust-lang.org/]\n[*-/ text]"),
             Ok((
                 "\n[*-/ text]",
                 ExternalLink::new(None, "https://www.rust-lang.org/")
+            ))
+        );
+        assert_eq!(
+            external_link("[Rustプログラミング言語 https://www.rust-lang.org/ja]"),
+            Ok((
+                "",
+                ExternalLink::new(
+                    Some("Rustプログラミング言語"),
+                    "https://www.rust-lang.org/ja"
+                )
+            ))
+        );
+        // Scrapbox actually doesn't parse this
+        assert_eq!(
+            external_link("[ https://www.rust-lang.org/ Rust ]"),
+            Ok((
+                "",
+                ExternalLink::new(Some("Rust "), "https://www.rust-lang.org/")
             ))
         );
     }
