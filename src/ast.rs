@@ -75,6 +75,7 @@ pub enum ExprKind {
     Heading(Heading),
     BlockQuate(BlockQuate),
     CodeBlock(CodeBlock),
+    Table(Table),
     Image(Image),
     Text(Text),
 }
@@ -122,6 +123,23 @@ impl CodeBlock {
         Self {
             file_name: file_name.to_string(),
             value: value.iter().map(|s| s.to_string()).collect(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Table {
+    pub name: String,
+    pub header: Vec<String>,
+    pub data: Vec<Vec<String>>,
+}
+
+impl Table {
+    pub fn new(name: &str, header: Vec<String>, data: Vec<Vec<String>>) -> Self {
+        Self {
+            name: name.into(),
+            header,
+            data,
         }
     }
 }

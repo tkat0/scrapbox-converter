@@ -52,4 +52,13 @@ code:hello.rs
  fn main() {
      println!("Hello, world!");
  }
+
+[** Table]
+table:table
+ 1\t2\t3
+ A\tB\tC
+ D\tE\tF
+
+table:table
+ 1\t2\t3
 `;

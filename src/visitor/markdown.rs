@@ -143,6 +143,32 @@ impl Visitor for MarkdownGen {
         None
     }
 
+    fn visit_table(&mut self, value: &Table) -> Option<TransformCommand> {
+        if value.header.is_empty() {
+            return None;
+        }
+
+        self.document
+            .push_str(&format!("| {} |", value.header.join(" | ")));
+        self.document.push_str("\n");
+
+        let sep = vec!["---"];
+        self.document.push_str(&format!(
+            "| {} |",
+            sep.repeat(value.header.len()).join(" | ")
+        ));
+
+        self.document.push_str("\n");
+        for row in &value.data {
+            if row.is_empty() {
+                break;
+            }
+            self.document.push_str(&format!("| {} |", row.join(" | ")));
+            self.document.push_str("\n");
+        }
+        None
+    }
+
     fn visit_image(&mut self, value: &Image) -> Option<TransformCommand> {
         self.document.push_str(&format!("![]({})", value.uri));
         None
@@ -267,6 +293,30 @@ mod test {
                         "https://www.rust-lang.org/static/images/rust-logo-blk.svg",
                     )))],
                 ),
+                Line::new(
+                    LineKind::Normal,
+                    vec![Expr::new(ExprKind::Table(Table::new(
+                        "table",
+                        vec!["a".into(), "b".into(), "c".into()],
+                        vec![vec!["d".into(), "e".into(), "f".into()]],
+                    )))],
+                ),
+                Line::new(
+                    LineKind::Normal,
+                    vec![Expr::new(ExprKind::Table(Table::new(
+                        "table",
+                        vec!["a".into(), "b".into(), "c".into()],
+                        vec![vec![]],
+                    )))],
+                ),
+                Line::new(
+                    LineKind::Normal,
+                    vec![Expr::new(ExprKind::Table(Table::new(
+                        "table",
+                        vec![],
+                        vec![vec![]],
+                    )))],
+                ),
             ],
         };
 
@@ -282,6 +332,14 @@ mod test {
             ```
 
             ![](https://www.rust-lang.org/static/images/rust-logo-blk.svg)
+            | a | b | c |
+            | --- | --- | --- |
+            | d | e | f |
+
+            | a | b | c |
+            | --- | --- | --- |
+            
+
         "#};
 
         assert_eq!(markdown, expected)

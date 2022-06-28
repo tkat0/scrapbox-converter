@@ -57,6 +57,7 @@ fn expr(input: Span) -> IResult<Option<Expr>> {
             map(hashtag, |s| Expr::new(ExprKind::HashTag(s))),
             map(block_quate, |s| Expr::new(ExprKind::BlockQuate(s))),
             map(code_block, |s| Expr::new(ExprKind::CodeBlock(s))),
+            map(table, |s| Expr::new(ExprKind::Table(s))),
             map(image, |s| Expr::new(ExprKind::Image(s))),
             map(emphasis, |c| Expr::new(ExprKind::Emphasis(c))),
             map(external_link, |c| Expr::new(ExprKind::ExternalLink(c))),
@@ -287,9 +288,47 @@ fn code_block(input: Span) -> IResult<CodeBlock> {
     )(input)
 }
 
-/// table:name
-/// a<tab>
-fn table() {}
+/// table:name\n
+///  A\tB\tC\n
+fn table(input: Span) -> IResult<Table> {
+    let (input, _) = tag("table:")(input)?;
+    let (input, name) = take_until("\n")(input)?;
+    let (input, _) = char('\n')(input)?;
+
+    fn row(input: Span) -> IResult<Vec<String>> {
+        let (input, text) = delimited(char(' '), take_while(|c| c != '\n'), char('\n'))(input)?;
+
+        fn take_until_t(input: Span) -> IResult<String> {
+            let (input, value) = take_until("\t")(input)?;
+            let (input, _) = tag("\t")(input)?;
+            Ok((input, value.to_string()))
+        }
+
+        fn take_until_n(input: Span) -> IResult<String> {
+            let (input, value) = take_until_eol(input)?;
+            Ok((input, value.to_string()))
+        }
+
+        let (text, mut x) = many0(take_until_t)(text)?;
+        let (text, y) = take_until_n(text)?;
+
+        if !y.is_empty() {
+            x.push(y);
+        }
+        assert!(text.is_empty());
+
+        Ok((input, x))
+    }
+
+    let (input, header) = opt(row)(input)?;
+
+    if let Some(header) = header {
+        let (input, rows) = many0(row)(input)?;
+        Ok((input, Table::new(*name, header, rows)))
+    } else {
+        Ok((input, Table::new(*name, vec![], vec![vec![]])))
+    }
+}
 
 /// >
 fn quote() {}
@@ -401,6 +440,18 @@ mod test {
     fn code_block_valid_test(input: &str, expected: (&str, CodeBlock)) {
         assert_eq!(
             code_block(Span::new(input)).map(|(input, ret)| (*input.fragment(), ret)),
+            Ok(expected)
+        );
+    }
+
+    #[rstest(input, expected,
+        case("table:table\n", ("", Table::new("table", vec![], vec![vec![]]))),
+        case("table:table\n a\tb\tc\n d\te\tf\n", ("", Table::new("table", vec!["a".into(), "b".into(), "c".into()], vec![vec!["d".into(), "e".into(), "f".into()]]))),
+        // case("table:table\n a\tb\tc\n", ("", Table::new("table", vec!["a".into(), "b".into(), "c".into()], vec![vec![]]))),
+    )]
+    fn table_valid_test(input: &str, expected: (&str, Table)) {
+        assert_eq!(
+            table(Span::new(input)).map(|(input, ret)| (*input.fragment(), ret)),
             Ok(expected)
         );
     }
