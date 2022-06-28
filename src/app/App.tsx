@@ -12,7 +12,7 @@ import {
   Textarea,
   Tooltip,
 } from "@chakra-ui/react";
-import { ArrowForwardIcon, CopyIcon, ExternalLinkIcon } from "@chakra-ui/icons";
+import { CopyIcon, ExternalLinkIcon } from "@chakra-ui/icons";
 import React, { useEffect, useState } from "react";
 
 import { useScrapboxToMarkdown, scrapboxToMarkdown } from "../main";
@@ -63,7 +63,7 @@ function App() {
   return (
     <Flex p="2" w="100vw" h="100vh" direction="column">
       <Header />
-      <Heading mb="2">Scrapbox To Markdown Converter (alpha)</Heading>
+      <Heading size="md">Scrapbox To Markdown Converter (alpha)</Heading>
       <Box m="2">
         <Link href="https://github.com/tkat0/scrapbox-converter" isExternal>
           https://github.com/tkat0/scrapbox-converter{" "}
@@ -73,8 +73,8 @@ function App() {
       <Box m="2">
         <ConfigModal config={config} setConfig={setConfig} />
       </Box>
-      <Flex alignItems="stretch" flexGrow={1}>
-        <Box flex="1" m="2">
+      <Flex flexGrow={1} flexWrap={"wrap"}>
+        <Box flex="1" m="2" minW={"3xs"}>
           <Tabs display="flex" isFitted h="100%" flexDirection="column">
             <TabList mb="1em" maxH="40px">
               <Tab>Scrapbox</Tab>
@@ -94,10 +94,7 @@ function App() {
             </TabPanels>
           </Tabs>
         </Box>
-        <Box>
-          <ArrowForwardIcon mt="4" />
-        </Box>
-        <Box flex="1" m="2">
+        <Box flex="1" m="2" minW={"3xs"}>
           <Tabs display="flex" isFitted h="100%" flexDirection="column">
             <TabList mb="1em" maxH="40px">
               <Tab>Markdown</Tab>
