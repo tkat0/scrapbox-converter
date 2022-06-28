@@ -19,16 +19,15 @@ pub struct Config {
     pub bold_to_heading: bool,
 }
 
-// TODO(tkat0): Result type
 #[wasm_bindgen(js_name = scrapboxToMarkdown)]
-pub fn scrapbox_to_markdown(input: &str, config: &JsValue) -> String {
-    let config: Config = config.into_serde().unwrap();
-    let (_, mut p) = page(Span::new(input)).unwrap();
+pub fn scrapbox_to_markdown(input: &str, config: &JsValue) -> Result<String, JsError> {
+    let config: Config = config.into_serde()?;
+    let (_, mut p) = page(Span::new(input))?;
     let mut pass = MarkdownPass {
         h1_level: config.heading1_mapping,
         bold_to_h: config.bold_to_heading,
     };
     pass.visit(&mut p);
     let mut visitor = MarkdownGen::new(MarkdownGenConfig::default());
-    visitor.generate(&mut p)
+    Ok(visitor.generate(&mut p))
 }

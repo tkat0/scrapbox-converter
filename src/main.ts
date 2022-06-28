@@ -10,7 +10,12 @@ export const init = async () => {
 };
 
 export const scrapboxToMarkdown = (input: string, config: Config): string => {
-  return scrapboxToMarkdownCore(input, config);
+  try {
+    return scrapboxToMarkdownCore(input, config);
+  } catch (error) {
+    console.error(error);
+    return "";
+  }
 };
 
 export const useScrapboxToMarkdown = (): boolean => {
