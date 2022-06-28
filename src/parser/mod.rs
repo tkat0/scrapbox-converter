@@ -2,7 +2,6 @@ use std::convert::identity;
 
 use nom::character::complete::{char, digit1};
 use nom::combinator::{opt, peek};
-use nom::error::{ParseError, VerboseError};
 use nom::multi::many1;
 use nom::sequence::terminated;
 use nom::{
@@ -13,23 +12,24 @@ use nom::{
     sequence::{delimited, preceded},
     Err,
 };
+use nom::{InputTakeAtPosition, Slice};
 
 use crate::ast::*;
 
 mod error;
 mod utils;
-use error::*;
+pub use error::*;
 use utils::*;
 
-pub fn page(input: &str) -> Result<&str, Page> {
+pub fn page(input: Span) -> IResult<Page> {
     let (input, lines) = many0(line)(input)?;
 
     Ok((input, Page { lines }))
 }
 
-fn line(input: &str) -> Result<&str, Line> {
+fn line(input: Span) -> IResult<Line> {
     if input.is_empty() {
-        return Err(Err::Error(VerboseError::from_char(input, ' ')));
+        return Err(Err::Error(ParseError::new(input, "line is empty".into())));
     }
 
     // skip '\n' if it is at the beginning of the line.
@@ -54,7 +54,7 @@ fn line(input: &str) -> Result<&str, Line> {
     }
 }
 
-fn expr(input: &str) -> Result<&str, Option<Expr>> {
+fn expr(input: Span) -> IResult<Option<Expr>> {
     map(
         alt((
             map(hashtag, |s| Expr::new(ExprKind::HashTag(s))),
@@ -75,7 +75,7 @@ fn expr(input: &str) -> Result<&str, Option<Expr>> {
 }
 
 /// #tag
-fn hashtag(input: &str) -> Result<&str, HashTag> {
+fn hashtag(input: Span) -> IResult<HashTag> {
     let terminators = vec![" ", "　", "\n"];
 
     // TODO(tkat0): "#[tag]" -> Error
@@ -86,21 +86,21 @@ fn hashtag(input: &str) -> Result<&str, HashTag> {
             tag("#"),
             take_while(move |c: char| !terminators.contains(&c.to_string().as_str())),
         ),
-        |s: &str| HashTag { value: s.into() },
+        |s: Span| HashTag::new(s.fragment()),
     )(input)
 }
 
-fn text(input: &str) -> Result<&str, Text> {
+fn text(input: Span) -> IResult<Text> {
     if input.is_empty() {
-        return Err(Err::Error(VerboseError::from_char(input, 'x')));
+        return Err(Err::Error(ParseError::new(input, "".into())));
     }
 
     if input.starts_with("#") {
-        return Err(Err::Error(VerboseError::from_char(input, ' ')));
+        return Err(Err::Error(ParseError::new(input, "".into())));
     }
 
     // "abc #tag" -> ("#tag", "abc ")
-    fn take_until_tag(input: &str) -> Result<&str, &str> {
+    fn take_until_tag(input: Span) -> IResult<Span> {
         // " #tag" -> ("#tag", " ")
         // allow "abc#tag"
         let (input, _) = peek(take_until(" #"))(input)?;
@@ -108,13 +108,13 @@ fn text(input: &str) -> Result<&str, Text> {
     }
 
     // "abc \n" -> ("", "abc ")
-    fn take_until_newline(input: &str) -> Result<&str, &str> {
+    fn take_until_newline(input: Span) -> IResult<Span> {
         let (input, text) = take_until("\n")(input)?;
         // let (input, _) = char('\n')(input)?;
         Ok((input, text))
     }
 
-    fn take_until_bracket(input: &str) -> Result<&str, &str> {
+    fn take_until_bracket(input: Span) -> IResult<Span> {
         take_while(|c| c != '[')(input)
     }
 
@@ -135,48 +135,51 @@ fn text(input: &str) -> Result<&str, Text> {
     match ret {
         Some(&(input, consumed)) => {
             if consumed.is_empty() {
-                return Err(Err::Error(VerboseError::from_char(input, ' ')));
+                return Err(Err::Error(ParseError::new(input, "".into())));
             }
-            let input = input.split_at(consumed.len()).1;
+            let input = input.slice(consumed.len()..);
             let text = Text {
-                value: consumed.into(),
+                value: consumed.to_string(),
             };
             return Ok((input, text));
         }
         None => {
-            return Err(Err::Error(VerboseError::from_char(input, ' ')));
+            return Err(Err::Error(ParseError::new(input, "".into())));
         }
     }
 }
 
 // [internal link]
-fn internal_link(input: &str) -> Result<&str, InternalLink> {
+fn internal_link(input: Span) -> IResult<InternalLink> {
     let (input, text) = bracket(input)?;
-    Ok((input, InternalLink::new(text)))
+    Ok((input, InternalLink::new(text.fragment())))
 }
 
 // https://www.rust-lang.org/
-fn external_link_plain(input: &str) -> Result<&str, ExternalLink> {
+fn external_link_plain(input: Span) -> IResult<ExternalLink> {
     map(url, |s| ExternalLink::new(None, &s))(input)
 }
 
 /// [https://www.rust-lang.org/] or [https://www.rust-lang.org/ Rust] or [Rust https://www.rust-lang.org/]
-fn external_link(input: &str) -> Result<&str, ExternalLink> {
+fn external_link(input: Span) -> IResult<ExternalLink> {
     let (input, text) = bracket(input)?;
 
     // [https://www.rust-lang.org/ Rust] or [https://www.rust-lang.org/]
-    fn url_title(input: &str) -> Result<&str, ExternalLink> {
+    fn url_title(input: Span) -> IResult<ExternalLink> {
         let (input, _) = space0(input)?;
         let (input, url) = url(input)?;
         let (title, _) = space0(input)?;
         let title = if title.is_empty() { None } else { Some(title) };
-        Ok(("", ExternalLink::new(title, &url)))
+        Ok((
+            Span::new(""),
+            ExternalLink::new(title.map(|span| *span.fragment()), &url),
+        ))
     }
 
     // [Rust https://www.rust-lang.org/]
     // [Rust Rust Rust https://www.rust-lang.org/]
     // [Rust　Rust　Rust　https://www.rust-lang.org/]
-    fn title_url(input: &str) -> Result<&str, ExternalLink> {
+    fn title_url(input: Span) -> IResult<ExternalLink> {
         let (input, title) = alt((
             take_until(" https://"),
             take_until(" http://"),
@@ -187,7 +190,10 @@ fn external_link(input: &str) -> Result<&str, ExternalLink> {
         let (input, _) = space1(input)?;
         let (rest, url) = url(input)?;
         assert!(rest.is_empty());
-        Ok(("", ExternalLink::new(title, &url)))
+        Ok((
+            rest,
+            ExternalLink::new(title.map(|span| *span.fragment()), &url),
+        ))
     }
 
     let (rest, link) = alt((url_title, title_url))(text)?;
@@ -197,7 +203,7 @@ fn external_link(input: &str) -> Result<&str, ExternalLink> {
 
 /// [http://cutedog.com https://i.gyazo.com/da78df293f9e83a74b5402411e2f2e01.png]
 /// [https://i.gyazo.com/da78df293f9e83a74b5402411e2f2e01.png]
-fn image(input: &str) -> Result<&str, Image> {
+fn image(input: Span) -> IResult<Image> {
     let ext = ["svg", "jpg", "jpeg", "png", "gif"];
     let (input, text) = bracket(input)?;
     let (text, url1) = url(text)?;
@@ -216,7 +222,7 @@ fn image(input: &str) -> Result<&str, Image> {
         // [http://cutedog.com https://i.gyazo.com/da78df293f9e83a74b5402411e2f2e01.png]
         return Ok((input, Image::new(&url2)));
     } else {
-        Err(Err::Error(VerboseError::from_char(input, ' ')))
+        Err(Err::Error(ParseError::new(input, "".into())))
     }
 }
 
@@ -227,7 +233,7 @@ fn icon() {}
 /// [[Bold]] or [* Bold] or [*** Bold]
 /// [/ italic]
 /// [- strikethrough]
-fn emphasis(input: &str) -> Result<&str, Emphasis> {
+fn emphasis(input: Span) -> IResult<Emphasis> {
     let (input, text) = bracket(input)?;
 
     let (rest, tokens) = take_while(|c| ['*', '/', '-'].contains(&c))(text)?;
@@ -245,29 +251,37 @@ fn emphasis(input: &str) -> Result<&str, Emphasis> {
         }
     }
 
-    Ok((input, Emphasis::new(text, bold, italic, strikethrough)))
+    Ok((
+        input,
+        Emphasis::new(text.fragment(), bold, italic, strikethrough),
+    ))
 }
 
 /// [$ Tex here]
 fn math() {}
 
 /// `block_quate`
-fn block_quate(input: &str) -> Result<&str, BlockQuate> {
+fn block_quate(input: Span) -> IResult<BlockQuate> {
     map(
         delimited(char('`'), take_while(|c| c != '`'), char('`')),
-        |v| BlockQuate::new(v),
+        |v: Span| BlockQuate::new(v.fragment()),
     )(input)
 }
 
 /// code:filename.extension
 /// TODO(tkat0): List + CodeBlock is not supported yet.
-fn code_block(input: &str) -> Result<&str, CodeBlock> {
+fn code_block(input: Span) -> IResult<CodeBlock> {
     let (input, _) = tag("code:")(input)?;
     let (input, file_name) = take_until("\n")(input)?;
     let (input, _) = char('\n')(input)?;
     map(
         many0(delimited(char(' '), take_while(|c| c != '\n'), char('\n'))),
-        |codes| CodeBlock::new(file_name, codes),
+        move |codes: Vec<Span>| {
+            CodeBlock::new(
+                file_name.fragment(),
+                codes.iter().map(|span| *span.fragment()).collect(),
+            )
+        },
     )(input)
 }
 
@@ -286,7 +300,7 @@ fn helpfeel() {}
 
 /// <tab>
 /// <tab>1.
-fn list(input: &str) -> Result<&str, Option<List>> {
+fn list(input: Span) -> IResult<Option<List>> {
     let (input, tabs) = opt(many1(char('\t')))(input)?;
     let (input, decimal) = opt(terminated(digit1, tag(". ")))(input)?;
     if let Some(tabs) = tabs {
@@ -310,293 +324,213 @@ fn list(input: &str) -> Result<&str, Option<List>> {
 mod test {
     use super::*;
     use indoc::indoc;
+    use rstest::rstest;
 
-    #[test]
-    fn hashtag_test() {
-        assert_eq!(hashtag("#tag"), Ok(("", HashTag::new("tag"))));
-        assert_eq!(hashtag("#tag\n"), Ok(("\n", HashTag::new("tag"))));
-        assert_eq!(hashtag("#tag "), Ok((" ", HashTag::new("tag"))));
-        assert_eq!(hashtag("#tag　"), Ok(("　", HashTag::new("tag"))));
-        assert_eq!(hashtag("####tag"), Ok(("", HashTag::new("###tag"))));
-        assert_eq!(hashtag("#[tag"), Ok(("", HashTag::new("[tag"))));
-        // assert!(hashtag("#[tag]").is_err());
-        // assert!(hashtag("# tag").is_err());
-    }
-
-    #[test]
-    fn list_test() {
-        assert_eq!(list("123abc"), Ok(("123abc", None)));
+    #[rstest(input, expected,
+        case("#tag", ("", HashTag::new("tag"))),
+        case("#tag\n", ("\n", HashTag::new("tag"))),
+        case("#tag ", (" ", HashTag::new("tag"))),
+        case("#tag　", ("　", HashTag::new("tag"))),
+        case("####tag", ("", HashTag::new("###tag"))),
+        case("#[tag", ("", HashTag::new("[tag"))),
+    )]
+    fn hashtag_valid_test(input: &str, expected: (&str, HashTag)) {
         assert_eq!(
-            list("\t\t123abc"),
-            Ok(("123abc", Some(List::new(ListKind::Disc, 2))))
-        );
-        assert_eq!(
-            list("\t123. abc"),
-            Ok(("abc", Some(List::new(ListKind::Decimal, 1))))
+            hashtag(Span::new(input)).map(|(input, ret)| (*input.fragment(), ret)),
+            Ok(expected)
         );
     }
 
-    #[test]
-    fn block_quate_test() {
-        assert!(block_quate("123abc").is_err());
-        assert!(block_quate("`123abc").is_err());
-        assert_eq!(block_quate("`code`"), Ok(("", BlockQuate::new("code"))));
+    // #[rstest(input, case("#[tag]"), case("# tag"))]
+    // fn hashtag_invalid_test(input: &str) {
+    //     if let Ok(ok) = hashtag(Span::new(input)) {
+    //         panic!("{:?}", ok)
+    //     }
+    // }
+
+    #[rstest(input, expected,
+        case("123abc", ("123abc", None)),
+        case("\t\t123abc", ("123abc", Some(List::new(ListKind::Disc, 2)))),
+        case("\t123. abc", ("abc", Some(List::new(ListKind::Decimal, 1)))),
+    )]
+    fn list_valid_test(input: &str, expected: (&str, Option<List>)) {
         assert_eq!(
-            block_quate("`code` test"),
-            Ok((" test", BlockQuate::new("code")))
+            list(Span::new(input)).map(|(input, ret)| (*input.fragment(), ret)),
+            Ok(expected)
         );
     }
 
-    #[test]
-    fn code_block_test() {
+    #[rstest(input, expected,
+        case("`code`", ("", BlockQuate::new("code"))),
+        case("`code` test", (" test", BlockQuate::new("code"))),
+    )]
+    fn block_quate_valid_test(input: &str, expected: (&str, BlockQuate)) {
         assert_eq!(
-            code_block("code:hello.rs\n     panic!()\n     panic!()\n"),
-            Ok((
-                "",
-                CodeBlock::new("hello.rs", vec!["    panic!()", "    panic!()"])
-            ))
+            block_quate(Span::new(input)).map(|(input, ret)| (*input.fragment(), ret)),
+            Ok(expected)
         );
     }
 
-    #[test]
-    fn image_test() {
+    #[rstest(input, case("123abc"), case("`123abc"))]
+    fn block_quate_invalid_test(input: &str) {
+        if let Ok(ok) = block_quate(Span::new(input)) {
+            panic!("{:?}", ok)
+        }
+    }
+
+    #[rstest(input, expected,
+        case("code:hello.rs\n     panic!()\n     panic!()\n", ("", CodeBlock::new("hello.rs", vec!["    panic!()", "    panic!()"]))),
+    )]
+    fn code_block_valid_test(input: &str, expected: (&str, CodeBlock)) {
         assert_eq!(
-            image("[https://www.rust-lang.org/static/images/rust-logo-blk.svg]"),
-            Ok((
-                "",
-                Image::new("https://www.rust-lang.org/static/images/rust-logo-blk.svg")
-            ))
+            code_block(Span::new(input)).map(|(input, ret)| (*input.fragment(), ret)),
+            Ok(expected)
         );
+    }
+
+    #[rstest(input, expected,
+        case("[https://www.rust-lang.org/static/images/rust-logo-blk.svg]", ("", Image::new("https://www.rust-lang.org/static/images/rust-logo-blk.svg"))),
         // TODO(tkat0): enable link
+        case("[https://www.rust-lang.org/ https://www.rust-lang.org/static/images/rust-logo-blk.svg]", ("", Image::new("https://www.rust-lang.org/static/images/rust-logo-blk.svg"))),
+        case("[https://www.rust-lang.org/　https://www.rust-lang.org/static/images/rust-logo-blk.svg]", ("", Image::new("https://www.rust-lang.org/static/images/rust-logo-blk.svg"))),
+    )]
+    fn image_valid_test(input: &str, expected: (&str, Image)) {
         assert_eq!(
-            image("[https://www.rust-lang.org/ https://www.rust-lang.org/static/images/rust-logo-blk.svg]"),
-            Ok((
-                "",
-                Image::new("https://www.rust-lang.org/static/images/rust-logo-blk.svg")
-            ))
-        );
-        assert_eq!(
-            image("[https://www.rust-lang.org/　https://www.rust-lang.org/static/images/rust-logo-blk.svg]"),
-            Ok((
-                "",
-                Image::new("https://www.rust-lang.org/static/images/rust-logo-blk.svg")
-            ))
+            image(Span::new(input)).map(|(input, ret)| (*input.fragment(), ret)),
+            Ok(expected)
         );
     }
 
-    #[test]
-    fn emphasis_test() {
+    #[rstest(input, expected,
+        case("[* text]", ("", Emphasis::bold_level("text", 1))),
+        case("[***** text]", ("", Emphasis::bold_level("text", 5))),
+        case("[/ text]", ("", Emphasis::italic("text"))),
+        case("[*/*-* text]", ("", Emphasis::new("text", 3, 1, 1))),
+    )]
+    fn emphasis_valid_test(input: &str, expected: (&str, Emphasis)) {
         assert_eq!(
-            emphasis("[* text]"),
-            Ok(("", Emphasis::bold_level("text", 1)))
-        );
-        assert_eq!(
-            emphasis("[***** text]"),
-            Ok(("", Emphasis::bold_level("text", 5)))
-        );
-        assert_eq!(emphasis("[/ text]"), Ok(("", Emphasis::italic("text"))));
-        assert_eq!(
-            emphasis("[- text]"),
-            Ok(("", Emphasis::strikethrough("text")))
-        );
-        assert_eq!(
-            emphasis("[*/*-* text]"),
-            Ok(("", Emphasis::new("text", 3, 1, 1)))
+            emphasis(Span::new(input)).map(|(input, ret)| (*input.fragment(), ret)),
+            Ok(expected)
         );
     }
 
-    #[test]
-    fn text_test() {
-        assert!(text("").is_err());
-        assert!(text("[* bold]").is_err());
-        assert!(text("#tag").is_err());
-        assert_eq!(text(" #tag"), Ok(("#tag", Text::new(" "))));
-        assert_eq!(text(" [url]"), Ok(("[url]", Text::new(" "))));
-        assert_eq!(text(" #tag["), Ok(("#tag[", Text::new(" "))));
-        assert_eq!(text(" [#tag"), Ok(("[#tag", Text::new(" "))));
-        assert_eq!(text(" [ #tag"), Ok(("[ #tag", Text::new(" "))));
-        assert_eq!(text(" \n"), Ok(("\n", Text::new(" "))));
-        assert_eq!(text("abc#tag"), Ok(("", Text::new("abc#tag"))));
-        assert_eq!(text("abc #tag"), Ok(("#tag", Text::new("abc "))));
-        assert_eq!(text(" #tag"), Ok(("#tag", Text::new(" "))));
-        assert_eq!(text("abc"), Ok(("", Text::new("abc"))));
-        assert_eq!(text("あいう"), Ok(("", Text::new("あいう"))));
-    }
-
-    #[test]
-    fn internal_link_test() {
+    #[rstest(input, expected,
+        case(" #tag", ("#tag", Text::new(" "))),
+        case(" #tag[", ("#tag[", Text::new(" "))),
+        case(" [#tag", ("[#tag", Text::new(" "))),
+        case(" [ #tag", ("[ #tag", Text::new(" "))),
+        case(" [url]", ("[url]", Text::new(" "))),
+        case(" \n", ("\n", Text::new(" "))),
+        case("abc#tag", ("", Text::new("abc#tag"))),
+        case("abc #tag", ("#tag", Text::new("abc "))),
+        case("あいう", ("", Text::new("あいう"))),
+    )]
+    fn text_valid_test(input: &str, expected: (&str, Text)) {
         assert_eq!(
-            internal_link("[title]"),
-            Ok(("", InternalLink::new("title")))
+            text(Span::new(input)).map(|(input, ret)| (*input.fragment(), ret)),
+            Ok(expected)
         );
     }
 
-    #[test]
-    fn external_link_plain_test() {
+    #[rstest(input, case(""), case("[* bold]"), case("#tag"))]
+    fn text_invalid_test(input: &str) {
+        if let Ok(ok) = text(Span::new(input)) {
+            panic!("{:?}", ok)
+        }
+    }
+
+    #[rstest(input, expected,
+        case("[title]", ("", InternalLink::new("title"))),
+    )]
+    fn internal_link_valid_test(input: &str, expected: (&str, InternalLink)) {
         assert_eq!(
-            external_link_plain("https://www.rust-lang.org/ abc"),
-            Ok((
-                " abc",
-                ExternalLink::new(None, "https://www.rust-lang.org/")
-            ))
+            internal_link(Span::new(input)).map(|(input, ret)| (*input.fragment(), ret)),
+            Ok(expected)
         );
     }
 
-    #[test]
-    fn external_link_test() {
+    #[rstest(input, expected,
+        case("https://www.rust-lang.org/ abc", (" abc", ExternalLink::new(None, "https://www.rust-lang.org/"))),
+    )]
+    fn external_link_plain_valid_test(input: &str, expected: (&str, ExternalLink)) {
         assert_eq!(
-            external_link("[https://www.rust-lang.org/]"),
-            Ok(("", ExternalLink::new(None, "https://www.rust-lang.org/")))
+            external_link_plain(Span::new(input)).map(|(input, ret)| (*input.fragment(), ret)),
+            Ok(expected)
         );
-        assert_eq!(
-            external_link("[  https://www.rust-lang.org/]"),
-            Ok(("", ExternalLink::new(None, "https://www.rust-lang.org/")))
-        );
-        assert_eq!(
-            external_link("[  https://www.rust-lang.org/  ]"),
-            Ok(("", ExternalLink::new(None, "https://www.rust-lang.org/")))
-        );
-        assert_eq!(
-            external_link("[Rust https://www.rust-lang.org/]"),
-            Ok((
-                "",
-                ExternalLink::new(Some("Rust"), "https://www.rust-lang.org/")
-            ))
-        );
-        assert_eq!(
-            external_link("[https://www.rust-lang.org/ Rust]"),
-            Ok((
-                "",
-                ExternalLink::new(Some("Rust"), "https://www.rust-lang.org/")
-            ))
-        );
-        assert_eq!(
-            external_link("[https://www.rust-lang.org/    Rust]"),
-            Ok((
-                "",
-                ExternalLink::new(Some("Rust"), "https://www.rust-lang.org/")
-            ))
-        );
-        assert_eq!(
-            external_link("[https://www.rust-lang.org/　Rust　Rust　Rust]"),
-            Ok((
-                "",
-                ExternalLink::new(Some("Rust　Rust　Rust"), "https://www.rust-lang.org/")
-            ))
-        );
-        assert_eq!(
-            external_link("[Rust　Rust　Rust　https://www.rust-lang.org/]"),
-            Ok((
-                "",
-                ExternalLink::new(Some("Rust　Rust　Rust"), "https://www.rust-lang.org/")
-            ))
-        );
-        assert_eq!(
-            external_link("[https://www.rust-lang.org/ Rust Rust Rust]"),
-            Ok((
-                "",
-                ExternalLink::new(Some("Rust Rust Rust"), "https://www.rust-lang.org/")
-            ))
-        );
-        assert_eq!(
-            external_link("[Rust Rust Rust https://www.rust-lang.org/]"),
-            Ok((
-                "",
-                ExternalLink::new(Some("Rust Rust Rust"), "https://www.rust-lang.org/")
-            ))
-        );
-        assert_eq!(
-            external_link("[https://www.rust-lang.org/]\n[*-/ text]"),
-            Ok((
-                "\n[*-/ text]",
-                ExternalLink::new(None, "https://www.rust-lang.org/")
-            ))
-        );
-        assert_eq!(
-            external_link("[Rustプログラミング言語 https://www.rust-lang.org/ja]"),
-            Ok((
-                "",
-                ExternalLink::new(
-                    Some("Rustプログラミング言語"),
-                    "https://www.rust-lang.org/ja"
-                )
-            ))
-        );
+    }
+
+    #[rstest(input, expected,
+        case("[https://www.rust-lang.org/]", ("", ExternalLink::new(None, "https://www.rust-lang.org/"))),
+        case("[  https://www.rust-lang.org/]", ("", ExternalLink::new(None, "https://www.rust-lang.org/"))),
+        case("[  https://www.rust-lang.org/  ]", ("", ExternalLink::new(None, "https://www.rust-lang.org/"))),
+        case("[Rust https://www.rust-lang.org/]", ("", ExternalLink::new(Some("Rust"), "https://www.rust-lang.org/"))),
+        case("[Rust  https://www.rust-lang.org/]", ("", ExternalLink::new(Some("Rust "), "https://www.rust-lang.org/"))),
+        case("[https://www.rust-lang.org/ Rust]", ("", ExternalLink::new(Some("Rust"), "https://www.rust-lang.org/"))),
+        case("[https://www.rust-lang.org/  Rust]", ("", ExternalLink::new(Some("Rust"), "https://www.rust-lang.org/"))),
+        case("[https://www.rust-lang.org/  Rust Rust Rust]", ("", ExternalLink::new(Some("Rust Rust Rust"), "https://www.rust-lang.org/"))),
+        case("[Rust Rust Rust https://www.rust-lang.org/]", ("", ExternalLink::new(Some("Rust Rust Rust"), "https://www.rust-lang.org/"))),
+        case("[https://www.rust-lang.org/]\n[*-/ text]", ("\n[*-/ text]", ExternalLink::new(None, "https://www.rust-lang.org/"))),
+        case("[Rustプログラミング言語 https://www.rust-lang.org/]", ("", ExternalLink::new(Some("Rustプログラミング言語"), "https://www.rust-lang.org/"))),
         // Scrapbox actually doesn't parse this
+        case("[ https://www.rust-lang.org/ Rust ]", ("", ExternalLink::new(Some("Rust "), "https://www.rust-lang.org/"))),
+    )]
+    fn external_link_valid_test(input: &str, expected: (&str, ExternalLink)) {
         assert_eq!(
-            external_link("[ https://www.rust-lang.org/ Rust ]"),
-            Ok((
-                "",
-                ExternalLink::new(Some("Rust "), "https://www.rust-lang.org/")
-            ))
+            external_link(Span::new(input)).map(|(input, ret)| (*input.fragment(), ret)),
+            Ok(expected)
         );
     }
 
-    #[test]
-    fn expr_test() {
-        assert!(expr("").is_err());
-        assert!(expr("\n").is_err());
+    #[rstest(input, expected,
+        case("abc #tag ", ("#tag ", Some(Expr::new(ExprKind::Text(Text::new("abc ")))))),
+        case("[title]abc", ("abc", Some(Expr::new(ExprKind::InternalLink(InternalLink::new("title")))))),
+    )]
+    fn expr_valid_test(input: &str, expected: (&str, Option<Expr>)) {
         assert_eq!(
-            expr("abc #tag "),
-            Ok(("#tag ", Some(Expr::new(ExprKind::Text(Text::new("abc "))))))
-        );
-        assert_eq!(
-            expr("#tag abc"),
-            Ok((
-                " abc",
-                Some(Expr::new(ExprKind::HashTag(HashTag::new("tag"))))
-            ))
-        );
-        assert_eq!(
-            expr("[title]abc"),
-            Ok((
-                "abc",
-                Some(Expr::new(ExprKind::InternalLink(InternalLink::new(
-                    "title"
-                ))))
-            ))
+            expr(Span::new(input)).map(|(input, ret)| (*input.fragment(), ret)),
+            Ok(expected)
         );
     }
 
-    #[test]
-    fn line_test() {
-        assert!(line("").is_err());
+    #[rstest(input, case(""), case("\n"))]
+    fn expr_invalid_test(input: &str) {
+        if let Ok(ok) = text(Span::new(input)) {
+            panic!("{:?}", ok)
+        }
+    }
+
+    #[rstest(input, expected,
+        case(" ", ("", Line::new( LineKind::Normal, vec![Expr::new(ExprKind::Text(Text::new(" ")))]))),
+        case("#tag #tag [internal link]\n", ("\n", Line::new(
+            LineKind::Normal,
+            vec![
+                Expr::new(ExprKind::HashTag(HashTag::new("tag"))),
+                Expr::new(ExprKind::Text(Text::new(" "))),
+                Expr::new(ExprKind::HashTag(HashTag::new("tag"))),
+                Expr::new(ExprKind::Text(Text::new(" "))),
+                Expr::new(ExprKind::InternalLink(InternalLink::new("internal link")))
+                ]
+            ))),
+    )]
+    fn line_valid_test(input: &str, expected: (&str, Line)) {
         assert_eq!(
-            line(" "),
-            Ok((
-                "",
-                Line::new(
-                    LineKind::Normal,
-                    vec![Expr::new(ExprKind::Text(Text::new(" ")))]
-                ),
-            ))
-        );
-        assert_eq!(
-            line("#tag #tag [internal link]\n"),
-            Ok((
-                "\n",
-                Line::new(
-                    LineKind::Normal,
-                    vec![
-                        Expr::new(ExprKind::HashTag(HashTag::new("tag"))),
-                        Expr::new(ExprKind::Text(Text::new(" "))),
-                        Expr::new(ExprKind::HashTag(HashTag::new("tag"))),
-                        Expr::new(ExprKind::Text(Text::new(" "))),
-                        Expr::new(ExprKind::InternalLink(InternalLink::new("internal link"))),
-                    ]
-                )
-            ))
+            line(Span::new(input)).map(|(input, ret)| (*input.fragment(), ret)),
+            Ok(expected)
         );
     }
 
-    #[test]
-    fn page_test() {
-        let actual = page(indoc! {"
+    #[rstest(input, case(""))]
+    fn line_invalid_test(input: &str) {
+        if let Ok(ok) = line(Span::new(input)) {
+            panic!("{:?}", ok)
+        }
+    }
+
+    #[rstest(input, expected,
+        case(indoc! {"
             abc
             #efg [internal link][https://www.rust-lang.org/]
-        "});
-
-        let expected = Page {
+        "}, ("", Page {
             lines: vec![
                 Line::new(
                     LineKind::Normal,
@@ -620,7 +554,12 @@ mod test {
                 ),
                 Line::new(LineKind::Normal, vec![]),
             ],
-        };
-        assert_eq!(actual, Ok(("", expected)))
+        }))
+    )]
+    fn page_valid_test(input: &str, expected: (&str, Page)) {
+        assert_eq!(
+            page(Span::new(input)).map(|(input, ret)| (*input.fragment(), ret)),
+            Ok(expected)
+        );
     }
 }

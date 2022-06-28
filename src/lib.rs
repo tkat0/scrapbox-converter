@@ -1,14 +1,16 @@
 use parser::page;
 use serde::{Deserialize, Serialize};
-use visitor::{
-    markdown::{MarkdownGen, MarkdownGenConfig, MarkdownPass},
-    Visitor,
-};
 use wasm_bindgen::prelude::*;
 
 mod ast;
 mod parser;
 mod visitor;
+
+use parser::Span;
+use visitor::{
+    markdown::{MarkdownGen, MarkdownGenConfig, MarkdownPass},
+    Visitor,
+};
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,10 +19,11 @@ pub struct Config {
     pub bold_to_heading: bool,
 }
 
+// TODO(tkat0): Result type
 #[wasm_bindgen(js_name = scrapboxToMarkdown)]
 pub fn scrapbox_to_markdown(input: &str, config: &JsValue) -> String {
     let config: Config = config.into_serde().unwrap();
-    let (_, mut p) = page(input).unwrap();
+    let (_, mut p) = page(Span::new(input)).unwrap();
     let mut pass = MarkdownPass {
         h1_level: config.heading1_mapping,
         bold_to_h: config.bold_to_heading,
