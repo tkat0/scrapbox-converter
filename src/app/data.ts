@@ -24,6 +24,7 @@ And then, It is compiled into WebAssembly and run in the browser without sending
 
 [** Emphasis]
 \t[* bold]
+\t[[bold]]
 \t[/ italic]
 \t[- strikethrough]
 \t[*-/ mix]

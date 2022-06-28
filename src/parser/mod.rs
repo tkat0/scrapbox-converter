@@ -60,6 +60,7 @@ fn expr(input: Span) -> IResult<Option<Expr>> {
             map(table, |s| Expr::new(ExprKind::Table(s))),
             map(image, |s| Expr::new(ExprKind::Image(s))),
             map(emphasis, |c| Expr::new(ExprKind::Emphasis(c))),
+            map(bold, |c| Expr::new(ExprKind::Emphasis(c))),
             map(external_link, |c| Expr::new(ExprKind::ExternalLink(c))),
             // NOTE(tkat0): keep internal_link at the bottom of parsing bracket expr
             map(internal_link, |c| Expr::new(ExprKind::InternalLink(c))),
@@ -258,6 +259,14 @@ fn emphasis(input: Span) -> IResult<Emphasis> {
         input,
         Emphasis::new(text.fragment(), bold, italic, strikethrough),
     ))
+}
+
+// [[bold]]
+fn bold(input: Span) -> IResult<Emphasis> {
+    map(
+        delimited(tag("[["), take_while(|c| c != ']'), tag("]]")),
+        |s: Span| Emphasis::bold(*s),
+    )(input)
 }
 
 /// [$ Tex here]
@@ -478,6 +487,16 @@ mod test {
     fn emphasis_valid_test(input: &str, expected: (&str, Emphasis)) {
         assert_eq!(
             emphasis(Span::new(input)).map(|(input, ret)| (*input.fragment(), ret)),
+            Ok(expected)
+        );
+    }
+
+    #[rstest(input, expected,
+        case("[[text]]", ("", Emphasis::bold_level("text", 1))),
+    )]
+    fn bold_valid_test(input: &str, expected: (&str, Emphasis)) {
+        assert_eq!(
+            bold(Span::new(input)).map(|(input, ret)| (*input.fragment(), ret)),
             Ok(expected)
         );
     }
