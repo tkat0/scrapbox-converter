@@ -1,18 +1,15 @@
 use std::convert::identity;
 
-use nom::character::complete::{char, digit1};
-use nom::combinator::{opt, peek};
-use nom::multi::many1;
-use nom::sequence::terminated;
 use nom::{
     branch::alt,
     bytes::complete::{tag, take_until, take_while},
-    combinator::map,
-    multi::many0,
+    character::complete::{char, digit1},
+    combinator::{map, opt, peek},
+    multi::{many0, many1},
+    sequence::terminated,
     sequence::{delimited, preceded},
-    Err,
+    Err, Slice,
 };
-use nom::{InputTakeAtPosition, Slice};
 
 use crate::ast::*;
 
@@ -97,6 +94,10 @@ fn text(input: Span) -> IResult<Text> {
 
     if input.starts_with("#") {
         return Err(Err::Error(ParseError::new(input, "".into())));
+    }
+
+    if let (rest, Some(value)) = opt(tag("["))(input)? {
+        return Ok((rest, Text::new(*value)));
     }
 
     // "abc #tag" -> ("#tag", "abc ")
@@ -424,6 +425,7 @@ mod test {
         case("abc#tag", ("", Text::new("abc#tag"))),
         case("abc #tag", ("#tag", Text::new("abc "))),
         case("あいう", ("", Text::new("あいう"))),
+        case("[", ("", Text::new("["))),
     )]
     fn text_valid_test(input: &str, expected: (&str, Text)) {
         assert_eq!(
@@ -484,6 +486,7 @@ mod test {
     #[rstest(input, expected,
         case("abc #tag ", ("#tag ", Some(Expr::new(ExprKind::Text(Text::new("abc ")))))),
         case("[title]abc", ("abc", Some(Expr::new(ExprKind::InternalLink(InternalLink::new("title")))))),
+        case("[", ("", Some(Expr::new(ExprKind::Text(Text::new("[")))))),
     )]
     fn expr_valid_test(input: &str, expected: (&str, Option<Expr>)) {
         assert_eq!(
