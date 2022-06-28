@@ -44,7 +44,7 @@ And then, It is compiled into WebAssembly and run in the browser without sending
 
 [** Code block]
 code:hello.rs
-\tfn main() {
-\t    println!("Hello, world!");
-\t}
+ fn main() {
+     println!("Hello, world!");
+ }
 `;
