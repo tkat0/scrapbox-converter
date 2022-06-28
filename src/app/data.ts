@@ -42,6 +42,11 @@ And then, It is compiled into WebAssembly and run in the browser without sending
 \t[https://www.rust-lang.org/static/images/rust-logo-blk.svg]
 \t[https://www.rust-lang.org/ https://www.rust-lang.org/static/images/rust-logo-blk.svg]
 
+[** Block quote and Commandline]
+\t\`git\`
+\t$ git log
+\t% git log
+
 [** Code block]
 code:hello.rs
  fn main() {

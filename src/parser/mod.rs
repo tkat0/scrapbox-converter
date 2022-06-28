@@ -2,7 +2,7 @@ use std::convert::identity;
 
 use nom::{
     branch::alt,
-    bytes::complete::{tag, take_until, take_while},
+    bytes::complete::{tag, take, take_until, take_while},
     character::complete::{char, digit1},
     combinator::{map, opt, peek},
     multi::{many0, many1},
@@ -65,6 +65,7 @@ fn expr(input: Span) -> IResult<Option<Expr>> {
             map(external_link_plain, |s| {
                 Expr::new(ExprKind::ExternalLink(s))
             }),
+            map(commandline, |s| Expr::new(ExprKind::BlockQuate(s))),
             map(text, |s| Expr::new(ExprKind::Text(s))),
         )),
         Some,
@@ -294,7 +295,12 @@ fn table() {}
 fn quote() {}
 
 /// $ hoge or % hoge
-fn commandline() {}
+fn commandline(input: Span) -> IResult<BlockQuate> {
+    let (input, prefix) = alt((tag("$ "), tag("% ")))(input)?;
+    let prefix = prefix.fragment().to_string();
+    let (input, text) = take_until_eol(input)?;
+    Ok((input, BlockQuate::new(&format!("{}{}", prefix, text))))
+}
 
 /// ? hoge
 fn helpfeel() {}
@@ -380,6 +386,16 @@ mod test {
     }
 
     #[rstest(input, expected,
+        case("$ code   ", ("", BlockQuate::new("$ code   "))),
+    )]
+    fn commandline_valid_test(input: &str, expected: (&str, BlockQuate)) {
+        assert_eq!(
+            commandline(Span::new(input)).map(|(input, ret)| (*input.fragment(), ret)),
+            Ok(expected)
+        );
+    }
+
+    #[rstest(input, expected,
         case("code:hello.rs\n     panic!()\n     panic!()\n", ("", CodeBlock::new("hello.rs", vec!["    panic!()", "    panic!()"]))),
     )]
     fn code_block_valid_test(input: &str, expected: (&str, CodeBlock)) {
@@ -434,7 +450,7 @@ mod test {
         );
     }
 
-    #[rstest(input, case(""), case("[* bold]"), case("#tag"))]
+    #[rstest(input, case(""), case("#tag"))]
     fn text_invalid_test(input: &str) {
         if let Ok(ok) = text(Span::new(input)) {
             panic!("{:?}", ok)

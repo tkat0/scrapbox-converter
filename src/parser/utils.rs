@@ -8,6 +8,10 @@ use nom::{
 
 use super::*;
 
+pub fn take_until_eol(input: Span) -> IResult<Span> {
+    alt((take_until("\n"), take(input.len())))(input)
+}
+
 // [abc]
 pub fn bracket(input: Span) -> IResult<Span> {
     delimited(char('['), take_while(|c| c != ']'), char(']'))(input)
@@ -44,6 +48,18 @@ pub fn is_space(c: char) -> bool {
 mod test {
     use super::*;
     use rstest::rstest;
+
+    #[rstest(input, expected,
+        case("", ("", "")),
+        case("abc\ndef", ("\ndef", "abc")),
+        case("abcdef", ("", "abcdef")),
+    )]
+    fn take_until_eol_valid_test(input: &str, expected: (&str, &str)) {
+        assert_eq!(
+            take_until_eol(Span::new(input)).map(|(input, ret)| (*input, *ret)),
+            Ok(expected)
+        );
+    }
 
     #[rstest(input, expected,
         case("[]", ("", "")),
