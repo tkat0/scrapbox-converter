@@ -62,6 +62,7 @@ fn expr(input: Span) -> IResult<Option<Expr>> {
             map(emphasis, |c| Expr::new(ExprKind::Emphasis(c))),
             map(bold, |c| Expr::new(ExprKind::Emphasis(c))),
             map(external_link, |c| Expr::new(ExprKind::ExternalLink(c))),
+            map(math, |c| Expr::new(ExprKind::Math(c))),
             map(external_link_other_project, |s| {
                 Expr::new(ExprKind::ExternalLink(s))
             }),
@@ -281,7 +282,12 @@ fn bold(input: Span) -> IResult<Emphasis> {
 }
 
 /// [$ Tex here]
-fn math() {}
+fn math(input: Span) -> IResult<Math> {
+    map(
+        delimited(tag("[$"), take_while(|c| c != ']'), char(']')),
+        |v: Span| Math::new(v.fragment()),
+    )(input)
+}
 
 /// `block_quate`
 fn block_quate(input: Span) -> IResult<BlockQuate> {
@@ -592,9 +598,20 @@ mod test {
     }
 
     #[rstest(input, expected,
+        case(r#"[$ \frac{-b \pm \sqrt{b^2-4ac}}{2a} ]"#, ("", Math::new(r#" \frac{-b \pm \sqrt{b^2-4ac}}{2a} "#))),
+    )]
+    fn math_valid_test(input: &str, expected: (&str, Math)) {
+        assert_eq!(
+            math(Span::new(input)).map(|(input, ret)| (*input.fragment(), ret)),
+            Ok(expected)
+        );
+    }
+
+    #[rstest(input, expected,
         case("abc #tag ", ("#tag ", Some(Expr::new(ExprKind::Text(Text::new("abc ")))))),
         case("[title]abc", ("abc", Some(Expr::new(ExprKind::InternalLink(InternalLink::new("title")))))),
         case("[", ("", Some(Expr::new(ExprKind::Text(Text::new("[")))))),
+        case(r#"[$ \frac{-b \pm \sqrt{b^2-4ac}}{2a} ]"#, ("", Some(Expr::new(ExprKind::Math(Math::new(r#" \frac{-b \pm \sqrt{b^2-4ac}}{2a} "#)))))),
     )]
     fn expr_valid_test(input: &str, expected: (&str, Option<Expr>)) {
         assert_eq!(

@@ -174,6 +174,11 @@ impl Visitor for MarkdownGen {
         None
     }
 
+    fn visit_math(&mut self, value: &Math) -> Option<TransformCommand> {
+        self.document.push_str(&format!("$${}$$", value.expr));
+        None
+    }
+
     fn visit_text(&mut self, value: &Text) -> Option<TransformCommand> {
         self.document.push_str(&format!("{}", value.value));
         None
@@ -317,6 +322,12 @@ mod test {
                         vec![vec![]],
                     )))],
                 ),
+                Line::new(
+                    LineKind::Normal,
+                    vec![Expr::new(ExprKind::Math(Math::new(
+                        r#"\frac{-b \pm \sqrt{b^2-4ac}}{2a}"#,
+                    )))],
+                ),
             ],
         };
 
@@ -338,8 +349,9 @@ mod test {
 
             | a | b | c |
             | --- | --- | --- |
-            
 
+
+            $$\frac{-b \pm \sqrt{b^2-4ac}}{2a}$$
         "#};
 
         assert_eq!(markdown, expected)

@@ -64,6 +64,7 @@ pub trait Visitor {
             ExprKind::CodeBlock(v) => self.visit_code_block(&v),
             ExprKind::Table(v) => self.visit_table(&v),
             ExprKind::Image(v) => self.visit_image(&v),
+            ExprKind::Math(v) => self.visit_math(&v),
             ExprKind::Text(v) => self.visit_text(&v),
         }
     }
@@ -101,6 +102,10 @@ pub trait Visitor {
     }
 
     fn visit_image(&mut self, _value: &Image) -> Option<TransformCommand> {
+        None
+    }
+
+    fn visit_math(&mut self, _value: &Math) -> Option<TransformCommand> {
         None
     }
 

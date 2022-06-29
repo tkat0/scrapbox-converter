@@ -3,6 +3,8 @@ import ChakraUIRenderer from "chakra-ui-markdown-renderer";
 import React from "react";
 import ReactMarkdown, { Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
+import rehypeMathjax from "rehype-mathjax";
+import remarkMath from "remark-math";
 
 const newTheme: Components = {
   a: (props) => {
@@ -26,7 +28,8 @@ export const Preview: React.FC<PreviewProps> = (props) => {
       components={ChakraUIRenderer(newTheme)}
       children={markdown}
       skipHtml
-      remarkPlugins={[remarkGfm]}
+      remarkPlugins={[remarkGfm, remarkMath]}
+      rehypePlugins={[rehypeMathjax]}
     />
   );
 };

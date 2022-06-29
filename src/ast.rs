@@ -77,6 +77,7 @@ pub enum ExprKind {
     CodeBlock(CodeBlock),
     Table(Table),
     Image(Image),
+    Math(Math),
     Text(Text),
 }
 
@@ -259,6 +260,17 @@ pub struct Image {
 impl Image {
     pub fn new(uri: &str) -> Self {
         Self { uri: uri.into() }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct Math {
+    pub expr: String,
+}
+
+impl Math {
+    pub fn new(expr: &str) -> Self {
+        Self { expr: expr.into() }
     }
 }
 
