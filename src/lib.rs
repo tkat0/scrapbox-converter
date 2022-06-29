@@ -31,3 +31,9 @@ pub fn scrapbox_to_markdown(input: &str, config: &JsValue) -> Result<String, JsE
     let mut visitor = MarkdownGen::new(MarkdownGenConfig::default());
     Ok(visitor.generate(&mut p))
 }
+
+#[wasm_bindgen(js_name = scrapboxToAST)]
+pub fn scrapbox_to_ast(input: &str) -> Result<String, JsError> {
+    let (_, p) = page(Span::new(input))?;
+    Ok(format!("{:#?}", &p))
+}

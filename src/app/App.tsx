@@ -16,7 +16,7 @@ import {
 import { CopyIcon, ExternalLinkIcon } from "@chakra-ui/icons";
 import React, { useEffect, useState } from "react";
 
-import { useScrapboxToMarkdown, scrapboxToMarkdown } from "../main";
+import { useWasm, scrapboxToMarkdown, scrapboxToAST } from "../main";
 import { ConfigModal, defaultConfig } from "./ConfigModal";
 import { defaultData } from "./data";
 import { Header } from "./Header";
@@ -64,16 +64,24 @@ const Form = (props: FormProps) => {
 };
 
 function App() {
-  const initialized = useScrapboxToMarkdown();
+  const initialized = useWasm();
   const [src, setSrc] = useState(getQuery() ?? defaultData);
   const [dst, setDst] = useState(src);
+  const [ast, setAST] = useState(src);
   const [config, setConfig] = useState(defaultConfig);
+  const [tabIndex, setTabIndex] = React.useState(0);
 
   useEffect(() => {
     if (!initialized) return;
-    const dst = scrapboxToMarkdown(src, config);
-    setDst(dst);
-  }, [initialized, src, config]);
+    if (tabIndex == 2) {
+      // AST
+      const ast = scrapboxToAST(src);
+      setAST(ast);
+    } else {
+      const dst = scrapboxToMarkdown(src, config);
+      setDst(dst);
+    }
+  }, [initialized, src, config, tabIndex]);
 
   const onChange = async (event: React.ChangeEvent<HTMLTextAreaElement>) => {
     const src = event.target.value;
@@ -119,10 +127,17 @@ function App() {
           </Tabs>
         </Box>
         <Box flex="1" m="2" minW={"3xs"}>
-          <Tabs display="flex" isFitted h="100%" flexDirection="column">
+          <Tabs
+            display="flex"
+            isFitted
+            h="100%"
+            flexDirection="column"
+            onChange={(index) => setTabIndex(index)}
+          >
             <TabList mb="1em" maxH="40px">
               <Tab>Markdown</Tab>
               <Tab>HTML</Tab>
+              <Tab>AST</Tab>
             </TabList>
             <TabPanels flexGrow={1}>
               <TabPanel p="0" h="100%">
@@ -130,6 +145,9 @@ function App() {
               </TabPanel>
               <TabPanel p="0" h="100%">
                 <Preview markdown={dst} />
+              </TabPanel>
+              <TabPanel p="0" h="100%">
+                <Form value={ast} />
               </TabPanel>
             </TabPanels>
           </Tabs>
