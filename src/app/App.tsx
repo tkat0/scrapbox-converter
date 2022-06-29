@@ -11,6 +11,7 @@ import {
   Tabs,
   Textarea,
   Tooltip,
+  useToast,
 } from "@chakra-ui/react";
 import { CopyIcon, ExternalLinkIcon } from "@chakra-ui/icons";
 import React, { useEffect, useState } from "react";
@@ -22,6 +23,9 @@ import { Header } from "./Header";
 import { Preview } from "./Preview";
 import { getQuery, copyQuery } from "./query";
 
+const MAX_FORM_LENGTH = 5000;
+const TOAST_ID_MAX_FORM_LENGTH = "max-form-length";
+
 interface FormProps {
   value: string;
   onChange?: (event: React.ChangeEvent<HTMLTextAreaElement>) => void;
@@ -29,11 +33,31 @@ interface FormProps {
 
 const Form = (props: FormProps) => {
   const { value, onChange } = props;
+  const isReadOnly = onChange === undefined;
+  const toast = useToast();
+
+  useEffect(() => {
+    if (
+      !isReadOnly &&
+      value.length >= MAX_FORM_LENGTH &&
+      !toast.isActive(TOAST_ID_MAX_FORM_LENGTH)
+    ) {
+      toast({
+        id: TOAST_ID_MAX_FORM_LENGTH,
+        description: `Please enter within ${MAX_FORM_LENGTH} characters`,
+        status: "error",
+        duration: 3000,
+        isClosable: true,
+      });
+    }
+  }, [value, isReadOnly]);
+
   return (
     <Textarea
       value={value}
       onChange={onChange}
-      isReadOnly={onChange === undefined}
+      isReadOnly={isReadOnly}
+      maxLength={MAX_FORM_LENGTH}
       h="100%"
     />
   );
