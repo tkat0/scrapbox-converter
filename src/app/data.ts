@@ -28,7 +28,6 @@ And then, It is compiled into WebAssembly and run in the browser without sending
 \t[/ italic]
 \t[- strikethrough]
 \t[*-/ mix]
-\t\`println("Hello, World!");\`
 
 [** Tag]
 \t#rust #scrapbox #obsidian #webassembly
@@ -38,6 +37,7 @@ And then, It is compiled into WebAssembly and run in the browser without sending
 \t[Scrapbox https://scrapbox.io]
 \t[https://scrapbox.io Scrapbox]
 \t[https://scrapbox.io]
+\t[/help-jp/Scrapbox]
 
 [** Image]
 \t[https://www.rust-lang.org/static/images/rust-logo-blk.svg]
