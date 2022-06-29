@@ -62,6 +62,9 @@ fn expr(input: Span) -> IResult<Option<Expr>> {
             map(emphasis, |c| Expr::new(ExprKind::Emphasis(c))),
             map(bold, |c| Expr::new(ExprKind::Emphasis(c))),
             map(external_link, |c| Expr::new(ExprKind::ExternalLink(c))),
+            map(external_link_other_project, |s| {
+                Expr::new(ExprKind::ExternalLink(s))
+            }),
             // NOTE(tkat0): keep internal_link at the bottom of parsing bracket expr
             map(internal_link, |c| Expr::new(ExprKind::InternalLink(c))),
             map(external_link_plain, |s| {
@@ -162,6 +165,14 @@ fn internal_link(input: Span) -> IResult<InternalLink> {
 // https://www.rust-lang.org/
 fn external_link_plain(input: Span) -> IResult<ExternalLink> {
     map(url, |s| ExternalLink::new(None, &s))(input)
+}
+
+// [/help-jp/Scrapbox]
+fn external_link_other_project(input: Span) -> IResult<ExternalLink> {
+    map(
+        delimited(tag("[/"), take_while(|c| c != ']'), char(']')),
+        |s: Span| ExternalLink::new(None, &format!("https://scrapbox.io/{}", *s)),
+    )(input)
 }
 
 /// [https://www.rust-lang.org/] or [https://www.rust-lang.org/ Rust] or [Rust https://www.rust-lang.org/]
@@ -543,6 +554,17 @@ mod test {
     fn external_link_plain_valid_test(input: &str, expected: (&str, ExternalLink)) {
         assert_eq!(
             external_link_plain(Span::new(input)).map(|(input, ret)| (*input.fragment(), ret)),
+            Ok(expected)
+        );
+    }
+
+    #[rstest(input, expected,
+        case("[/help-jp/Scrapbox]", ("", ExternalLink::new(None, "https://scrapbox.io/help-jp/Scrapbox"))),
+    )]
+    fn external_link_other_project_valid_test(input: &str, expected: (&str, ExternalLink)) {
+        assert_eq!(
+            external_link_other_project(Span::new(input))
+                .map(|(input, ret)| (*input.fragment(), ret)),
             Ok(expected)
         );
     }
