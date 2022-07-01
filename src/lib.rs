@@ -12,6 +12,19 @@ use visitor::{
     Visitor,
 };
 
+#[wasm_bindgen(typescript_custom_section)]
+const TS_APPEND_CONTENT: &'static str = r#"
+
+export interface Config {
+  /** Maps which bold level of Scrapbox to heading of Markdown */
+  heading1Mapping: number;
+  /** Maps bold of Scrapbox to the minimum level of heading of Markdown */
+  boldToHeading: boolean;
+}
+
+export function scrapboxToMarkdown(input: string, config: Config): string;
+"#;
+
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Config {
@@ -19,7 +32,7 @@ pub struct Config {
     pub bold_to_heading: bool,
 }
 
-#[wasm_bindgen(js_name = scrapboxToMarkdown)]
+#[wasm_bindgen(js_name = scrapboxToMarkdown, skip_typescript)]
 pub fn scrapbox_to_markdown(input: &str, config: &JsValue) -> Result<String, JsError> {
     let config: Config = config.into_serde()?;
     let (_, mut p) = page(Span::new(input))?;

@@ -3,8 +3,8 @@ import { useEffect, useState } from "react";
 import initCore, {
   scrapboxToMarkdown as scrapboxToMarkdownCore,
   scrapboxToAST as scrapboxToASTCore,
+  Config,
 } from "@@/scrapbox_converter_core";
-import { Config } from "./app/ConfigModal";
 
 export const init = async () => {
   await initCore();

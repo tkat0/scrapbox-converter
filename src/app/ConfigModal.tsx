@@ -1,3 +1,4 @@
+import { Config } from "@@/scrapbox_converter_core";
 import {
   Box,
   Button,
@@ -23,11 +24,6 @@ import {
   useDisclosure,
 } from "@chakra-ui/react";
 import React from "react";
-
-export interface Config {
-  heading1Mapping: number;
-  boldToHeading: boolean;
-}
 
 export const defaultConfig: Config = {
   heading1Mapping: 4,
