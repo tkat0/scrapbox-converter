@@ -1,4 +1,4 @@
-use parser::page;
+use parser::scrapbox::page;
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
