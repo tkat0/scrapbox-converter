@@ -12,61 +12,21 @@ pub enum TransformCommand {
     Delete,
 }
 
-pub trait Visitor {
+pub trait Visitor: Sized {
     fn visit(&mut self, value: &mut Page) {
         self.visit_page(value);
     }
 
     fn visit_page(&mut self, value: &mut Page) {
-        for line in value.lines.iter_mut() {
-            self.visit_line(line);
-        }
+        walk_page(self, value);
     }
 
     fn visit_line(&mut self, value: &mut Line) {
-        // Execute all expres' commands
-        let mut commands = HashMap::new();
-        for (i, item) in value.values.iter().enumerate() {
-            let command = self.visit_expr(item);
-            if let Some(c) = command {
-                commands.insert(i, c);
-            }
-        }
-
-        // Replace
-        for (&i, command) in &commands {
-            if let TransformCommand::Replace(s) = command {
-                value.values[i] = s.clone();
-            }
-        }
-
-        // Delete
-        let mut i = 0;
-        value.values.retain(|_| {
-            let retain = if let Some(TransformCommand::Delete) = commands.get(&i) {
-                false
-            } else {
-                true
-            };
-            i += 1;
-            retain
-        });
+        walk_line(self, value);
     }
 
     fn visit_expr(&mut self, value: &Expr) -> Option<TransformCommand> {
-        match &value.kind {
-            ExprKind::HashTag(v) => self.visit_hashtag(&v),
-            ExprKind::InternalLink(v) => self.visit_internal_link(&v),
-            ExprKind::ExternalLink(v) => self.visit_external_link(&v),
-            ExprKind::Emphasis(v) => self.visit_emphasis(&v),
-            ExprKind::Heading(v) => self.visit_heading(&v),
-            ExprKind::BlockQuate(v) => self.visit_block_quate(&v),
-            ExprKind::CodeBlock(v) => self.visit_code_block(&v),
-            ExprKind::Table(v) => self.visit_table(&v),
-            ExprKind::Image(v) => self.visit_image(&v),
-            ExprKind::Math(v) => self.visit_math(&v),
-            ExprKind::Text(v) => self.visit_text(&v),
-        }
+        walk_expr(self, value)
     }
 
     fn visit_hashtag(&mut self, _value: &HashTag) -> Option<TransformCommand> {
@@ -111,5 +71,57 @@ pub trait Visitor {
 
     fn visit_text(&mut self, _text: &Text) -> Option<TransformCommand> {
         None
+    }
+}
+
+fn walk_page<V: Visitor>(visitor: &mut V, value: &mut Page) {
+    for line in value.lines.iter_mut() {
+        visitor.visit_line(line);
+    }
+}
+
+fn walk_line<V: Visitor>(visitor: &mut V, value: &mut Line) {
+    // Execute all expres' commands
+    let mut commands = HashMap::new();
+    for (i, item) in value.values.iter().enumerate() {
+        let command = visitor.visit_expr(item);
+        if let Some(c) = command {
+            commands.insert(i, c);
+        }
+    }
+
+    // Replace
+    for (&i, command) in &commands {
+        if let TransformCommand::Replace(s) = command {
+            value.values[i] = s.clone();
+        }
+    }
+
+    // Delete
+    let mut i = 0;
+    value.values.retain(|_| {
+        let retain = if let Some(TransformCommand::Delete) = commands.get(&i) {
+            false
+        } else {
+            true
+        };
+        i += 1;
+        retain
+    });
+}
+
+fn walk_expr<V: Visitor>(visitor: &mut V, value: &Expr) -> Option<TransformCommand> {
+    match &value.kind {
+        ExprKind::HashTag(v) => visitor.visit_hashtag(&v),
+        ExprKind::InternalLink(v) => visitor.visit_internal_link(&v),
+        ExprKind::ExternalLink(v) => visitor.visit_external_link(&v),
+        ExprKind::Emphasis(v) => visitor.visit_emphasis(&v),
+        ExprKind::Heading(v) => visitor.visit_heading(&v),
+        ExprKind::BlockQuate(v) => visitor.visit_block_quate(&v),
+        ExprKind::CodeBlock(v) => visitor.visit_code_block(&v),
+        ExprKind::Table(v) => visitor.visit_table(&v),
+        ExprKind::Image(v) => visitor.visit_image(&v),
+        ExprKind::Math(v) => visitor.visit_math(&v),
+        ExprKind::Text(v) => visitor.visit_text(&v),
     }
 }
