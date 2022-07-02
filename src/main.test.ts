@@ -11,7 +11,7 @@ describe(`scrapboxToMarkdown`, () => {
 
   it(`should convert a internal link`, () => {
     expect(scrapboxToMarkdown(`[internal-link]`, defaultConfig)).toEqual(
-      `[[internal-link]]\n`
+      `[[internal-link]]`
     );
   });
 });

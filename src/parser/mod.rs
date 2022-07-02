@@ -1,5 +1,3 @@
-use std::convert::identity;
-
 use nom::{
     branch::alt,
     bytes::complete::{tag, take, take_until, take_while},
@@ -19,63 +17,50 @@ pub use error::*;
 use utils::*;
 
 pub fn page(input: Span) -> IResult<Page> {
-    let (input, lines) = many0(line)(input)?;
-
-    Ok((input, Page { lines }))
+    let (input, nodes) = many0(alt((
+        // parser for multiline block
+        map(code_block, |s| Node::new(NodeKind::CodeBlock(s))),
+        map(table, |s| Node::new(NodeKind::Table(s))),
+        map(list, |s| Node::new(NodeKind::List(s))),
+        map(paragraph, |s| Node::new(NodeKind::Paragraph(s))),
+        // workaround for no-newline like "hoge"
+        // map(text, |s| Node::new(NodeKind::Text(s))),
+        node,
+    )))(input)?;
+    Ok((input, Page { nodes }))
 }
 
-fn line(input: Span) -> IResult<Line> {
-    if input.is_empty() {
-        return Err(Err::Error(ParseError::new(input, "line is empty".into())));
-    }
-
-    // skip '\n' if it is at the beginning of the line.
-    let (input, _) = opt(char('\n'))(input)?;
-
-    let (input, list) = list(input)?;
-
-    if let Some(list) = &list {
-        map(many0(expr), |c| {
-            Line::new(
-                LineKind::List(list.clone()),
-                c.into_iter().filter_map(identity).collect(),
-            )
-        })(input)
-    } else {
-        map(many0(expr), |c| {
-            Line::new(
-                LineKind::Normal,
-                c.into_iter().filter_map(identity).collect(),
-            )
-        })(input)
-    }
+fn paragraph(input: Span) -> IResult<Paragraph> {
+    map(terminated(many0(node), char('\n')), |children| {
+        Paragraph::new(children)
+    })(input)
 }
 
-fn expr(input: Span) -> IResult<Option<Expr>> {
-    map(
-        alt((
-            map(hashtag, |s| Expr::new(ExprKind::HashTag(s))),
-            map(block_quate, |s| Expr::new(ExprKind::BlockQuate(s))),
-            map(code_block, |s| Expr::new(ExprKind::CodeBlock(s))),
-            map(table, |s| Expr::new(ExprKind::Table(s))),
-            map(image, |s| Expr::new(ExprKind::Image(s))),
-            map(emphasis, |c| Expr::new(ExprKind::Emphasis(c))),
-            map(bold, |c| Expr::new(ExprKind::Emphasis(c))),
-            map(external_link, |c| Expr::new(ExprKind::ExternalLink(c))),
-            map(math, |c| Expr::new(ExprKind::Math(c))),
-            map(external_link_other_project, |s| {
-                Expr::new(ExprKind::ExternalLink(s))
-            }),
-            // NOTE(tkat0): keep internal_link at the bottom of parsing bracket expr
-            map(internal_link, |c| Expr::new(ExprKind::InternalLink(c))),
-            map(external_link_plain, |s| {
-                Expr::new(ExprKind::ExternalLink(s))
-            }),
-            map(commandline, |s| Expr::new(ExprKind::BlockQuate(s))),
-            map(text, |s| Expr::new(ExprKind::Text(s))),
-        )),
-        Some,
-    )(input)
+fn list(input: Span) -> IResult<List> {
+    map(many1(list_item), |children| List::new(children))(input)
+}
+
+fn node(input: Span) -> IResult<Node> {
+    alt((
+        // parser for single line
+        map(hashtag, |s| Node::new(NodeKind::HashTag(s))),
+        map(block_quate, |s| Node::new(NodeKind::BlockQuate(s))),
+        map(image, |s| Node::new(NodeKind::Image(s))),
+        map(emphasis, |c| Node::new(NodeKind::Emphasis(c))),
+        map(bold, |c| Node::new(NodeKind::Emphasis(c))),
+        map(external_link, |c| Node::new(NodeKind::ExternalLink(c))),
+        map(math, |c| Node::new(NodeKind::Math(c))),
+        map(external_link_other_project, |s| {
+            Node::new(NodeKind::ExternalLink(s))
+        }),
+        // NOTE(tkat0): keep internal_link at the bottom of parsing bracket node
+        map(internal_link, |c| Node::new(NodeKind::InternalLink(c))),
+        map(external_link_plain, |s| {
+            Node::new(NodeKind::ExternalLink(s))
+        }),
+        map(commandline, |s| Node::new(NodeKind::BlockQuate(s))),
+        map(text, |s| Node::new(NodeKind::Text(s))),
+    ))(input)
 }
 
 /// #tag
@@ -115,13 +100,6 @@ fn text(input: Span) -> IResult<Text> {
         take_until("#")(input)
     }
 
-    // "abc \n" -> ("", "abc ")
-    fn take_until_newline(input: Span) -> IResult<Span> {
-        let (input, text) = take_until("\n")(input)?;
-        // let (input, _) = char('\n')(input)?;
-        Ok((input, text))
-    }
-
     fn take_until_bracket(input: Span) -> IResult<Span> {
         take_while(|c| c != '[')(input)
     }
@@ -131,7 +109,7 @@ fn text(input: Span) -> IResult<Text> {
     let ret = vec![
         peek(take_until_tag)(input),
         peek(take_until_bracket)(input),
-        peek(take_until_newline)(input),
+        peek(take_until_eol)(input),
     ];
 
     let ret = ret
@@ -372,24 +350,16 @@ fn helpfeel() {}
 
 /// <tab>
 /// <tab>1.
-fn list(input: Span) -> IResult<Option<List>> {
-    let (input, tabs) = opt(many1(char('\t')))(input)?;
+fn list_item(input: Span) -> IResult<ListItem> {
+    let (input, tabs) = many1(char('\t'))(input)?;
     let (input, decimal) = opt(terminated(digit1, tag(". ")))(input)?;
-    if let Some(tabs) = tabs {
-        let kind = match &decimal {
-            Some(_) => ListKind::Decimal,
-            None => ListKind::Disc,
-        };
-        Ok((
-            input,
-            Some(List {
-                level: tabs.len(),
-                kind,
-            }),
-        ))
-    } else {
-        Ok((input, None))
-    }
+    let kind = match &decimal {
+        Some(_) => ListKind::Decimal,
+        None => ListKind::Disc,
+    };
+    let (input, children) = many0(node)(input)?;
+    let (input, _) = char('\n')(input)?;
+    Ok((input, ListItem::new(kind, tabs.len(), children)))
 }
 
 #[cfg(test)]
@@ -421,11 +391,10 @@ mod test {
     // }
 
     #[rstest(input, expected,
-        case("123abc", ("123abc", None)),
-        case("\t\t123abc", ("123abc", Some(List::new(ListKind::Disc, 2)))),
-        case("\t123. abc", ("abc", Some(List::new(ListKind::Decimal, 1)))),
+        case("\t\t123abc\n", ("", List::new(vec![ListItem::new(ListKind::Disc, 2, vec![Node::new(NodeKind::Text(Text::new("123abc")))])]))),
+        case("\t123. abc\n", ("", List::new(vec![ListItem::new(ListKind::Decimal, 1, vec![Node::new(NodeKind::Text(Text::new("abc")))])]))),
     )]
-    fn list_valid_test(input: &str, expected: (&str, Option<List>)) {
+    fn list_valid_test(input: &str, expected: (&str, List)) {
         assert_eq!(
             list(Span::new(input)).map(|(input, ret)| (*input.fragment(), ret)),
             Ok(expected)
@@ -608,48 +577,47 @@ mod test {
     }
 
     #[rstest(input, expected,
-        case("abc #tag ", ("#tag ", Some(Expr::new(ExprKind::Text(Text::new("abc ")))))),
-        case("[title]abc", ("abc", Some(Expr::new(ExprKind::InternalLink(InternalLink::new("title")))))),
-        case("[", ("", Some(Expr::new(ExprKind::Text(Text::new("[")))))),
-        case(r#"[$ \frac{-b \pm \sqrt{b^2-4ac}}{2a} ]"#, ("", Some(Expr::new(ExprKind::Math(Math::new(r#" \frac{-b \pm \sqrt{b^2-4ac}}{2a} "#)))))),
+        case("abc #tag ", ("#tag ", Node::new(NodeKind::Text(Text::new("abc "))))),
+        case("[title]abc", ("abc", Node::new(NodeKind::InternalLink(InternalLink::new("title"))))),
+        case("[", ("", Node::new(NodeKind::Text(Text::new("["))))),
+        case(r#"[$ \frac{-b \pm \sqrt{b^2-4ac}}{2a} ]"#, ("", Node::new(NodeKind::Math(Math::new(r#" \frac{-b \pm \sqrt{b^2-4ac}}{2a} "#))))),
     )]
-    fn expr_valid_test(input: &str, expected: (&str, Option<Expr>)) {
+    fn node_valid_test(input: &str, expected: (&str, Node)) {
         assert_eq!(
-            expr(Span::new(input)).map(|(input, ret)| (*input.fragment(), ret)),
+            node(Span::new(input)).map(|(input, ret)| (*input.fragment(), ret)),
             Ok(expected)
         );
     }
 
     #[rstest(input, case(""), case("\n"))]
-    fn expr_invalid_test(input: &str) {
+    fn node_invalid_test(input: &str) {
         if let Ok(ok) = text(Span::new(input)) {
             panic!("{:?}", ok)
         }
     }
 
     #[rstest(input, expected,
-        case(" ", ("", Line::new( LineKind::Normal, vec![Expr::new(ExprKind::Text(Text::new(" ")))]))),
-        case("#tag #tag [internal link]\n", ("\n", Line::new(
-            LineKind::Normal,
+        case(" \n", ("", Paragraph::new( vec![Node::new(NodeKind::Text(Text::new(" ")))]))),
+        case("#tag #tag [internal link]\n", ("", Paragraph::new(
             vec![
-                Expr::new(ExprKind::HashTag(HashTag::new("tag"))),
-                Expr::new(ExprKind::Text(Text::new(" "))),
-                Expr::new(ExprKind::HashTag(HashTag::new("tag"))),
-                Expr::new(ExprKind::Text(Text::new(" "))),
-                Expr::new(ExprKind::InternalLink(InternalLink::new("internal link")))
+                Node::new(NodeKind::HashTag(HashTag::new("tag"))),
+                Node::new(NodeKind::Text(Text::new(" "))),
+                Node::new(NodeKind::HashTag(HashTag::new("tag"))),
+                Node::new(NodeKind::Text(Text::new(" "))),
+                Node::new(NodeKind::InternalLink(InternalLink::new("internal link")))
                 ]
             ))),
     )]
-    fn line_valid_test(input: &str, expected: (&str, Line)) {
+    fn paragraph_valid_test(input: &str, expected: (&str, Paragraph)) {
         assert_eq!(
-            line(Span::new(input)).map(|(input, ret)| (*input.fragment(), ret)),
+            paragraph(Span::new(input)).map(|(input, ret)| (*input.fragment(), ret)),
             Ok(expected)
         );
     }
 
-    #[rstest(input, case(""))]
-    fn line_invalid_test(input: &str) {
-        if let Ok(ok) = line(Span::new(input)) {
+    #[rstest(input, case(" "), case(""))]
+    fn paragraph_invalid_test(input: &str) {
+        if let Ok(ok) = paragraph(Span::new(input)) {
             panic!("{:?}", ok)
         }
     }
@@ -659,29 +627,43 @@ mod test {
             abc
             #efg [internal link][https://www.rust-lang.org/]
         "}, ("", Page {
-            lines: vec![
-                Line::new(
-                    LineKind::Normal,
-                    vec![Expr::new(ExprKind::Text(Text {
+            nodes: vec![
+                Node::new(NodeKind::Paragraph(Paragraph::new(vec![
+                        Node::new(NodeKind::Text(Text {
                         value: "abc".into(),
-                    }))],
-                ),
-                Line::new(
-                    LineKind::Normal,
-                    vec![
-                        Expr::new(ExprKind::HashTag(HashTag {
+                    }))
+                ]))),
+                Node::new(NodeKind::Paragraph(Paragraph::new(vec![
+                        Node::new(NodeKind::HashTag(HashTag {
                             value: "efg".into(),
                         })),
-                        Expr::new(ExprKind::Text(Text { value: " ".into() })),
-                        Expr::new(ExprKind::InternalLink(InternalLink::new("internal link"))),
-                        Expr::new(ExprKind::ExternalLink(ExternalLink::new(
+                        Node::new(NodeKind::Text(Text { value: " ".into() })),
+                        Node::new(NodeKind::InternalLink(InternalLink::new("internal link"))),
+                        Node::new(NodeKind::ExternalLink(ExternalLink::new(
                             None,
                             "https://www.rust-lang.org/",
                         ))),
-                    ],
-                ),
-                Line::new(LineKind::Normal, vec![]),
-            ],
+                ]))),
+            ]
+        })),
+        case(indoc! {"
+            a
+
+            b
+        "}, ("", Page {
+            nodes: vec![
+                Node::new(NodeKind::Paragraph(Paragraph::new(vec![
+                        Node::new(NodeKind::Text(Text {
+                        value: "a".into(),
+                    }))
+                ]))),
+                                Node::new(NodeKind::Paragraph(Paragraph::new(vec![]))),
+                Node::new(NodeKind::Paragraph(Paragraph::new(vec![
+                        Node::new(NodeKind::Text(Text {
+                        value: "b".into(),
+                    }))
+                ]))),
+            ]
         }))
     )]
     fn page_valid_test(input: &str, expected: (&str, Page)) {

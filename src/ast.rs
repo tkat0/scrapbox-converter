@@ -1,73 +1,25 @@
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct Page {
-    pub lines: Vec<Line>,
+    pub nodes: Vec<Node>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Line {
-    pub kind: LineKind,
-    pub values: Vec<Expr>,
+pub struct Node {
+    pub id: NodeId,
+    pub kind: NodeKind,
 }
 
-impl Line {
-    pub fn new(kind: LineKind, values: Vec<Expr>) -> Self {
-        Self { kind, values }
-    }
-}
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Hash)]
+pub struct NodeId(usize);
+
+/// When parsing the AST, NodeId is given this dummy Id.
+/// Then, during a later phase, it will be replaced.
+pub const DUMMY_NODE_ID: NodeId = NodeId(usize::MIN);
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum LineKind {
-    Normal,
+pub enum NodeKind {
+    Paragraph(Paragraph),
     List(List),
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct List {
-    pub kind: ListKind,
-    pub level: usize,
-}
-
-impl List {
-    pub fn new(kind: ListKind, level: usize) -> Self {
-        Self { kind, level }
-    }
-
-    pub fn disc(level: usize) -> Self {
-        Self {
-            kind: ListKind::Disc,
-            level,
-        }
-    }
-
-    pub fn decimal(level: usize) -> Self {
-        Self {
-            kind: ListKind::Decimal,
-            level,
-        }
-    }
-
-    pub fn alphabet(level: usize) -> Self {
-        Self {
-            kind: ListKind::Alphabet,
-            level,
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum ListKind {
-    Disc,
-    Decimal,
-    Alphabet,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct Expr {
-    pub kind: ExprKind,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum ExprKind {
     HashTag(HashTag),
     InternalLink(InternalLink),
     ExternalLink(ExternalLink),
@@ -79,11 +31,85 @@ pub enum ExprKind {
     Image(Image),
     Math(Math),
     Text(Text),
+    Nop,
 }
 
-impl Expr {
-    pub fn new(kind: ExprKind) -> Self {
-        Self { kind }
+impl Node {
+    pub fn new(kind: NodeKind) -> Self {
+        Self {
+            id: DUMMY_NODE_ID,
+            kind,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Paragraph {
+    pub children: Vec<Node>,
+}
+
+impl Paragraph {
+    pub fn new(children: Vec<Node>) -> Self {
+        Self { children }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct List {
+    pub children: Vec<ListItem>,
+}
+
+impl List {
+    pub fn new(children: Vec<ListItem>) -> Self {
+        Self { children }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum ListKind {
+    Disc,
+    Decimal,
+    Alphabet,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ListItem {
+    pub kind: ListKind,
+    pub level: usize,
+    pub children: Vec<Node>,
+}
+
+impl ListItem {
+    pub fn new(kind: ListKind, level: usize, children: Vec<Node>) -> Self {
+        Self {
+            kind,
+            level,
+            children,
+        }
+    }
+
+    pub fn disc(level: usize, children: Vec<Node>) -> Self {
+        Self {
+            kind: ListKind::Disc,
+            level,
+            children,
+        }
+    }
+
+    pub fn decimal(level: usize, children: Vec<Node>) -> Self {
+        Self {
+            kind: ListKind::Decimal,
+            level,
+            children,
+        }
+    }
+
+    pub fn alphabet(level: usize, children: Vec<Node>) -> Self {
+        Self {
+            kind: ListKind::Alphabet,
+            level,
+            children,
+        }
     }
 }
 
@@ -116,14 +142,14 @@ impl BlockQuate {
 #[derive(Debug, Clone, PartialEq)]
 pub struct CodeBlock {
     pub file_name: String,
-    pub value: Vec<String>,
+    pub children: Vec<String>,
 }
 
 impl CodeBlock {
-    pub fn new(file_name: &str, value: Vec<&str>) -> Self {
+    pub fn new(file_name: &str, children: Vec<&str>) -> Self {
         Self {
             file_name: file_name.to_string(),
-            value: value.iter().map(|s| s.to_string()).collect(),
+            children: children.iter().map(|s| s.to_string()).collect(),
         }
     }
 }
@@ -132,15 +158,15 @@ impl CodeBlock {
 pub struct Table {
     pub name: String,
     pub header: Vec<String>,
-    pub data: Vec<Vec<String>>,
+    pub rows: Vec<Vec<String>>,
 }
 
 impl Table {
-    pub fn new(name: &str, header: Vec<String>, data: Vec<Vec<String>>) -> Self {
+    pub fn new(name: &str, header: Vec<String>, rows: Vec<Vec<String>>) -> Self {
         Self {
             name: name.into(),
             header,
-            data,
+            rows,
         }
     }
 }
@@ -265,12 +291,14 @@ impl Image {
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct Math {
-    pub expr: String,
+    pub value: String,
 }
 
 impl Math {
-    pub fn new(expr: &str) -> Self {
-        Self { expr: expr.into() }
+    pub fn new(value: &str) -> Self {
+        Self {
+            value: value.into(),
+        }
     }
 }
 
@@ -281,29 +309,21 @@ mod test {
     #[test]
     fn ast_test() {
         let page = Page {
-            lines: vec![
-                Line::new(
-                    LineKind::Normal,
+            nodes: vec![
+                Node::new(NodeKind::List(List::new(vec![ListItem::new(
+                    ListKind::Disc,
+                    1,
                     vec![
-                        Expr::new(ExprKind::Text(Text {
-                            value: "abc".to_string(),
-                        })),
-                        Expr::new(ExprKind::HashTag(HashTag {
-                            value: "tag".to_string(),
-                        })),
-                        Expr::new(ExprKind::Text(Text {
-                            value: " ".to_string(),
-                        })),
-                        Expr::new(ExprKind::ExternalLink(ExternalLink::new(
+                        Node::new(NodeKind::Text(Text::new("abc"))),
+                        Node::new(NodeKind::HashTag(HashTag::new("tag"))),
+                        Node::new(NodeKind::Text(Text::new(" "))),
+                        Node::new(NodeKind::ExternalLink(ExternalLink::new(
                             Some("Rust"),
                             "https://www.rust-lang.org/",
                         ))),
                     ],
-                ),
-                Line::new(
-                    LineKind::List(List::disc(1)),
-                    vec![Expr::new(ExprKind::BlockQuate(BlockQuate::new("git")))],
-                ),
+                )]))),
+                Node::new(NodeKind::BlockQuate(BlockQuate::new("git"))),
             ],
         };
 

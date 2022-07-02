@@ -1,14 +1,12 @@
-use std::collections::HashMap;
-
 use crate::ast::*;
 
 pub mod markdown;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum TransformCommand {
-    /// Replace the current expr with the specified expr.
-    Replace(Expr),
-    /// Delete the current expr.
+    /// Replace the current node with the specified node.
+    Replace(NodeKind),
+    /// Delete the current node.
     Delete,
 }
 
@@ -21,12 +19,16 @@ pub trait Visitor: Sized {
         walk_page(self, value);
     }
 
-    fn visit_line(&mut self, value: &mut Line) {
-        walk_line(self, value);
+    fn visit_node(&mut self, value: &mut Node) {
+        walk_node(self, value)
     }
 
-    fn visit_expr(&mut self, value: &Expr) -> Option<TransformCommand> {
-        walk_expr(self, value)
+    fn visit_paragraph(&mut self, value: &mut Paragraph) -> Option<TransformCommand> {
+        walk_paragraph(self, value)
+    }
+
+    fn visit_list(&mut self, value: &mut List) -> Option<TransformCommand> {
+        None
     }
 
     fn visit_hashtag(&mut self, _value: &HashTag) -> Option<TransformCommand> {
@@ -75,53 +77,39 @@ pub trait Visitor: Sized {
 }
 
 fn walk_page<V: Visitor>(visitor: &mut V, value: &mut Page) {
-    for line in value.lines.iter_mut() {
-        visitor.visit_line(line);
+    for node in value.nodes.iter_mut() {
+        visitor.visit_node(node);
     }
 }
 
-fn walk_line<V: Visitor>(visitor: &mut V, value: &mut Line) {
-    // Execute all expres' commands
-    let mut commands = HashMap::new();
-    for (i, item) in value.values.iter().enumerate() {
-        let command = visitor.visit_expr(item);
-        if let Some(c) = command {
-            commands.insert(i, c);
-        }
-    }
+fn walk_node<V: Visitor>(visitor: &mut V, value: &mut Node) {
+    let command = match value.kind.clone() {
+        NodeKind::Paragraph(mut v) => visitor.visit_paragraph(&mut v),
+        NodeKind::List(mut v) => visitor.visit_list(&mut v),
+        NodeKind::HashTag(v) => visitor.visit_hashtag(&v),
+        NodeKind::InternalLink(v) => visitor.visit_internal_link(&v),
+        NodeKind::ExternalLink(v) => visitor.visit_external_link(&v),
+        NodeKind::Emphasis(v) => visitor.visit_emphasis(&v),
+        NodeKind::Heading(v) => visitor.visit_heading(&v),
+        NodeKind::BlockQuate(v) => visitor.visit_block_quate(&v),
+        NodeKind::CodeBlock(v) => visitor.visit_code_block(&v),
+        NodeKind::Table(v) => visitor.visit_table(&v),
+        NodeKind::Image(v) => visitor.visit_image(&v),
+        NodeKind::Math(v) => visitor.visit_math(&v),
+        NodeKind::Text(v) => visitor.visit_text(&v),
+        NodeKind::Nop => None,
+    };
 
-    // Replace
-    for (&i, command) in &commands {
-        if let TransformCommand::Replace(s) = command {
-            value.values[i] = s.clone();
-        }
+    match command {
+        Some(TransformCommand::Replace(kind)) => value.kind = kind,
+        Some(TransformCommand::Delete) => value.kind = NodeKind::Nop,
+        None => {}
     }
-
-    // Delete
-    let mut i = 0;
-    value.values.retain(|_| {
-        let retain = if let Some(TransformCommand::Delete) = commands.get(&i) {
-            false
-        } else {
-            true
-        };
-        i += 1;
-        retain
-    });
 }
 
-fn walk_expr<V: Visitor>(visitor: &mut V, value: &Expr) -> Option<TransformCommand> {
-    match &value.kind {
-        ExprKind::HashTag(v) => visitor.visit_hashtag(&v),
-        ExprKind::InternalLink(v) => visitor.visit_internal_link(&v),
-        ExprKind::ExternalLink(v) => visitor.visit_external_link(&v),
-        ExprKind::Emphasis(v) => visitor.visit_emphasis(&v),
-        ExprKind::Heading(v) => visitor.visit_heading(&v),
-        ExprKind::BlockQuate(v) => visitor.visit_block_quate(&v),
-        ExprKind::CodeBlock(v) => visitor.visit_code_block(&v),
-        ExprKind::Table(v) => visitor.visit_table(&v),
-        ExprKind::Image(v) => visitor.visit_image(&v),
-        ExprKind::Math(v) => visitor.visit_math(&v),
-        ExprKind::Text(v) => visitor.visit_text(&v),
+fn walk_paragraph<V: Visitor>(visitor: &mut V, value: &mut Paragraph) -> Option<TransformCommand> {
+    for node in value.children.iter_mut() {
+        visitor.visit_node(node);
     }
+    None
 }

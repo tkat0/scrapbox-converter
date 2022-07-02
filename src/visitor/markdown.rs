@@ -1,4 +1,4 @@
-use super::{TransformCommand, Visitor};
+use super::{walk_paragraph, TransformCommand, Visitor};
 use crate::ast::*;
 
 pub struct MarkdownPass {
@@ -29,8 +29,9 @@ impl Visitor for MarkdownPass {
             && h_level <= self.h1_level
             && (self.bold_to_h || (!self.bold_to_h && emphasis.bold > 1))
         {
-            Some(TransformCommand::Replace(Expr::new(ExprKind::Heading(
-                Heading::new(&emphasis.text, h_level),
+            Some(TransformCommand::Replace(NodeKind::Heading(Heading::new(
+                &emphasis.text,
+                h_level,
             ))))
         } else {
             None
@@ -70,19 +71,26 @@ impl MarkdownGen {
 }
 
 impl Visitor for MarkdownGen {
-    fn visit_page(&mut self, value: &mut Page) {
-        for line in value.lines.iter_mut() {
-            if let LineKind::List(list) = &line.kind {
-                let indent = self.config.indent.repeat(list.level - 1);
-                match &list.kind {
-                    ListKind::Disc => self.document.push_str(&format!("{}* ", indent)),
-                    ListKind::Decimal => self.document.push_str(&format!("{}1. ", indent)),
-                    _ => {}
-                }
+    fn visit_paragraph(&mut self, value: &mut Paragraph) -> Option<TransformCommand> {
+        walk_paragraph(self, value);
+        self.document.push_str("\n");
+        None
+    }
+
+    fn visit_list(&mut self, value: &mut List) -> Option<TransformCommand> {
+        for item in value.children.iter_mut() {
+            let indent = self.config.indent.repeat(item.level - 1);
+            match &item.kind {
+                ListKind::Disc => self.document.push_str(&format!("{}* ", indent)),
+                ListKind::Decimal => self.document.push_str(&format!("{}1. ", indent)),
+                _ => {}
             }
-            self.visit_line(line);
+            for node in item.children.iter_mut() {
+                self.visit_node(node);
+            }
             self.document.push_str("\n");
         }
+        None
     }
 
     fn visit_hashtag(&mut self, value: &HashTag) -> Option<TransformCommand> {
@@ -136,7 +144,7 @@ impl Visitor for MarkdownGen {
 
     fn visit_code_block(&mut self, value: &CodeBlock) -> Option<TransformCommand> {
         self.document.push_str(&format!("```{}\n", value.file_name));
-        for code in &value.value {
+        for code in &value.children {
             self.document.push_str(&format!("{}\n", code));
         }
         self.document.push_str("```\n");
@@ -159,7 +167,7 @@ impl Visitor for MarkdownGen {
         ));
 
         self.document.push_str("\n");
-        for row in &value.data {
+        for row in &value.rows {
             if row.is_empty() {
                 break;
             }
@@ -175,7 +183,7 @@ impl Visitor for MarkdownGen {
     }
 
     fn visit_math(&mut self, value: &Math) -> Option<TransformCommand> {
-        self.document.push_str(&format!("$${}$$", value.expr));
+        self.document.push_str(&format!("$${}$$", value.value));
         None
     }
 
@@ -194,42 +202,12 @@ mod test {
     fn pass_test() {
         let mut pass = MarkdownPass::default();
 
-        let mut page = Page {
-            lines: vec![Line::new(
-                LineKind::Normal,
-                vec![Expr::new(ExprKind::Emphasis(Emphasis::bold_level(
-                    "text", 3,
-                )))],
-            )],
-        };
-
-        pass.visit(&mut page);
-
         assert_eq!(
-            page.lines[0].values[0],
-            Expr::new(ExprKind::Heading(Heading::new("text", 1)))
-        )
-    }
-
-    #[test]
-    fn pass_fallback_test() {
-        let mut pass = MarkdownPass::default();
-
-        let mut page = Page {
-            lines: vec![Line::new(
-                LineKind::Normal,
-                vec![Expr::new(ExprKind::Emphasis(Emphasis::bold_level(
-                    "text", 10,
-                )))],
-            )],
-        };
-
-        pass.visit(&mut page);
-
-        assert_eq!(
-            page.lines[0].values[0],
-            Expr::new(ExprKind::Emphasis(Emphasis::bold_level("text", 10)))
-        )
+            pass.visit_emphasis(&mut Emphasis::bold_level("text", 3)),
+            Some(TransformCommand::Replace(NodeKind::Heading(Heading::new(
+                "text", 1
+            ))))
+        );
     }
 
     #[test]
@@ -240,20 +218,11 @@ mod test {
         };
 
         // TODO(tkat0): not supoprted: `[*-/ mix]` -> `### *~~mix~~*` (but `### mix`)
-        let mut page = Page {
-            lines: vec![Line::new(
-                LineKind::Normal,
-                vec![Expr::new(ExprKind::Emphasis(Emphasis::bold_level(
-                    "text", 1,
-                )))],
-            )],
-        };
-
-        pass.visit(&mut page);
-
         assert_eq!(
-            page.lines[0].values[0],
-            Expr::new(ExprKind::Heading(Heading::new("text", 3)))
+            pass.visit_emphasis(&mut Emphasis::bold_level("text", 1)),
+            Some(TransformCommand::Replace(NodeKind::Heading(Heading::new(
+                "text", 3
+            ))))
         )
     }
 
@@ -262,72 +231,58 @@ mod test {
         let mut visitor = MarkdownGen::new(MarkdownGenConfig::default());
 
         let mut page = Page {
-            lines: vec![
-                Line::new(
-                    LineKind::Normal,
-                    vec![
-                        Expr::new(ExprKind::Text(Text {
-                            value: "abc ".into(),
-                        })),
-                        Expr::new(ExprKind::HashTag(HashTag {
-                            value: "tag".into(),
-                        })),
-                        Expr::new(ExprKind::Text(Text { value: " ".into() })),
-                        Expr::new(ExprKind::ExternalLink(ExternalLink::new(
-                            Some("Rust"),
-                            "https://www.rust-lang.org/",
-                        ))),
-                    ],
-                ),
-                Line::new(
-                    LineKind::List(List::new(ListKind::Disc, 2)),
-                    vec![Expr::new(ExprKind::Text(Text {
+            nodes: vec![
+                Node::new(NodeKind::Paragraph(Paragraph::new(vec![
+                    Node::new(NodeKind::Text(Text {
+                        value: "abc ".into(),
+                    })),
+                    Node::new(NodeKind::HashTag(HashTag {
+                        value: "tag".into(),
+                    })),
+                    Node::new(NodeKind::Text(Text { value: " ".into() })),
+                    Node::new(NodeKind::ExternalLink(ExternalLink::new(
+                        Some("Rust"),
+                        "https://www.rust-lang.org/",
+                    ))),
+                ]))),
+                Node::new(NodeKind::List(List::new(vec![ListItem::new(
+                    ListKind::Disc,
+                    2,
+                    vec![Node::new(NodeKind::Text(Text {
                         value: "abc".into(),
                     }))],
-                ),
-                Line::new(
-                    LineKind::Normal,
-                    vec![Expr::new(ExprKind::CodeBlock(CodeBlock::new(
+                )]))),
+                Node::new(NodeKind::Paragraph(Paragraph::new(vec![Node::new(
+                    NodeKind::CodeBlock(CodeBlock::new(
                         "hello.rs",
                         vec!["fn main() {", r#"    println("Hello, World!");"#, "}"],
-                    )))],
-                ),
-                Line::new(
-                    LineKind::Normal,
-                    vec![Expr::new(ExprKind::Image(Image::new(
+                    )),
+                )]))),
+                Node::new(NodeKind::Paragraph(Paragraph::new(vec![Node::new(
+                    NodeKind::Image(Image::new(
                         "https://www.rust-lang.org/static/images/rust-logo-blk.svg",
-                    )))],
-                ),
-                Line::new(
-                    LineKind::Normal,
-                    vec![Expr::new(ExprKind::Table(Table::new(
+                    )),
+                )]))),
+                Node::new(NodeKind::Paragraph(Paragraph::new(vec![Node::new(
+                    NodeKind::Table(Table::new(
                         "table",
                         vec!["a".into(), "b".into(), "c".into()],
                         vec![vec!["d".into(), "e".into(), "f".into()]],
-                    )))],
-                ),
-                Line::new(
-                    LineKind::Normal,
-                    vec![Expr::new(ExprKind::Table(Table::new(
+                    )),
+                )]))),
+                Node::new(NodeKind::Paragraph(Paragraph::new(vec![Node::new(
+                    NodeKind::Table(Table::new(
                         "table",
                         vec!["a".into(), "b".into(), "c".into()],
                         vec![vec![]],
-                    )))],
-                ),
-                Line::new(
-                    LineKind::Normal,
-                    vec![Expr::new(ExprKind::Table(Table::new(
-                        "table",
-                        vec![],
-                        vec![vec![]],
-                    )))],
-                ),
-                Line::new(
-                    LineKind::Normal,
-                    vec![Expr::new(ExprKind::Math(Math::new(
-                        r#"\frac{-b \pm \sqrt{b^2-4ac}}{2a}"#,
-                    )))],
-                ),
+                    )),
+                )]))),
+                Node::new(NodeKind::Paragraph(Paragraph::new(vec![Node::new(
+                    NodeKind::Table(Table::new("table", vec![], vec![vec![]])),
+                )]))),
+                Node::new(NodeKind::Paragraph(Paragraph::new(vec![Node::new(
+                    NodeKind::Math(Math::new(r#"\frac{-b \pm \sqrt{b^2-4ac}}{2a}"#)),
+                )]))),
             ],
         };
 
