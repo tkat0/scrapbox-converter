@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import initCore, {
   scrapboxToMarkdown as scrapboxToMarkdownCore,
   scrapboxToAST as scrapboxToASTCore,
+  markdownToScrapbox as markdownToScrapboxCore,
+  markdownToAST as markdownToASTCore,
   Config,
 } from "@@/scrapbox_converter_core";
 
@@ -22,6 +24,24 @@ export const scrapboxToMarkdown = (input: string, config: Config): string => {
 export const scrapboxToAST = (input: string): string => {
   try {
     return scrapboxToASTCore(input);
+  } catch (error) {
+    console.error(error);
+    return "";
+  }
+};
+
+export const markdownToScrapbox = (input: string): string => {
+  try {
+    return markdownToScrapboxCore(input);
+  } catch (error) {
+    console.error(error);
+    return "";
+  }
+};
+
+export const markdownToAST = (input: string): string => {
+  try {
+    return markdownToASTCore(input);
   } catch (error) {
     console.error(error);
     return "";

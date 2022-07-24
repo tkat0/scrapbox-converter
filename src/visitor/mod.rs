@@ -1,6 +1,7 @@
 use crate::ast::*;
 
-pub mod markdown;
+pub mod markdown_printer;
+pub mod scrapbox_printer;
 
 #[derive(Debug, PartialEq)]
 pub enum TransformCommand {

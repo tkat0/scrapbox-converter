@@ -8,7 +8,8 @@ mod visitor;
 
 use parser::Span;
 use visitor::{
-    markdown::{MarkdownGen, MarkdownGenConfig, MarkdownPass},
+    markdown_printer::{MarkdownPass, MarkdownPrinter, MarkdownPrinterConfig},
+    scrapbox_printer::{ScrapboxPrinter, ScrapboxPrinterConfig},
     Visitor,
 };
 
@@ -28,7 +29,7 @@ export function scrapboxToMarkdown(input: string, config: Config): string;
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Config {
-    pub heading1_mapping: u8,
+    pub heading1_mapping: usize,
     pub bold_to_heading: bool,
 }
 
@@ -41,12 +42,25 @@ pub fn scrapbox_to_markdown(input: &str, config: &JsValue) -> Result<String, JsE
         bold_to_h: config.bold_to_heading,
     };
     pass.visit(&mut p);
-    let mut visitor = MarkdownGen::new(MarkdownGenConfig::default());
+    let mut visitor = MarkdownPrinter::new(MarkdownPrinterConfig::default());
     Ok(visitor.generate(&mut p))
 }
 
 #[wasm_bindgen(js_name = scrapboxToAST)]
 pub fn scrapbox_to_ast(input: &str) -> Result<String, JsError> {
     let (_, p) = page(Span::new(input))?;
+    Ok(format!("{:#?}", &p))
+}
+
+#[wasm_bindgen(js_name = markdownToScrapbox)]
+pub fn markdown_to_scrapbox(input: &str) -> Result<String, JsError> {
+    let (_, mut p) = parser::markdown::page(Span::new(input))?;
+    let mut visitor = ScrapboxPrinter::new(ScrapboxPrinterConfig::default());
+    Ok(visitor.generate(&mut p))
+}
+
+#[wasm_bindgen(js_name = markdownToAST)]
+pub fn markdown_to_ast(input: &str) -> Result<String, JsError> {
+    let (_, p) = parser::markdown::page(Span::new(input))?;
     Ok(format!("{:#?}", &p))
 }

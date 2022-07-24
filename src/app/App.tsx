@@ -16,9 +16,15 @@ import {
 import { CopyIcon, ExternalLinkIcon } from "@chakra-ui/icons";
 import React, { useEffect, useState } from "react";
 
-import { useWasm, scrapboxToMarkdown, scrapboxToAST } from "../main";
+import {
+  useWasm,
+  scrapboxToMarkdown,
+  scrapboxToAST,
+  markdownToScrapbox,
+  markdownToAST,
+} from "../main";
 import { ConfigModal, defaultConfig } from "./ConfigModal";
-import { defaultData } from "./data";
+import { defaultScrapboxData, defaultMarkdownData } from "./data";
 import { Header } from "./Header";
 import { Preview } from "./Preview";
 import { getQuery, copyQuery } from "./query";
@@ -65,37 +71,114 @@ const Form = (props: FormProps) => {
 
 function App() {
   const initialized = useWasm();
-  const [src, setSrc] = useState(getQuery() ?? defaultData);
-  const [dst, setDst] = useState(src);
-  const [ast, setAST] = useState(src);
+  const query = getQuery();
+  const [scrapboxSrc, setScrapboxSrc] = useState(
+    query.form ?? defaultScrapboxData
+  );
+  const [markdownSrc, setMarkdownSrc] = useState(
+    query.form ?? defaultMarkdownData
+  );
+  const [dst, setDst] = useState(scrapboxSrc);
   const [config, setConfig] = useState(defaultConfig);
-  const [tabIndex, setTabIndex] = React.useState(0);
+  const [srcTabIndex, setSrcTabIndex] = React.useState(query.tabIndex ?? 0);
+  const [dstTabIndex, setDstTabIndex] = React.useState(query.tabIndex ?? 0);
 
   useEffect(() => {
     if (!initialized) return;
-    if (tabIndex == 2) {
-      // AST
-      const ast = scrapboxToAST(src);
-      setAST(ast);
-    } else {
-      const dst = scrapboxToMarkdown(src, config);
-      setDst(dst);
-    }
-  }, [initialized, src, config, tabIndex]);
 
-  const onChange = async (event: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const mapping: ((() => void) | null)[][] = [
+      [
+        // scrapbox to
+        () => {
+          const dst = scrapboxToMarkdown(scrapboxSrc, config);
+          setDst(dst);
+        },
+        null,
+        () => {
+          const dst = scrapboxToMarkdown(scrapboxSrc, config);
+          setDst(dst);
+        },
+        () => {
+          const dst = scrapboxToAST(scrapboxSrc);
+          setDst(dst);
+        },
+      ],
+      [
+        // markdown to
+        null,
+        () => {
+          const dst = markdownToScrapbox(markdownSrc);
+          setDst(dst);
+        },
+        () => {
+          // show markdown directly
+          setDst(markdownSrc);
+        },
+        () => {
+          const dst = markdownToAST(markdownSrc);
+          setDst(dst);
+        },
+      ],
+    ];
+
+    const f = mapping[srcTabIndex][dstTabIndex];
+    f && f();
+  }, [initialized, scrapboxSrc, markdownSrc, config, srcTabIndex, dstTabIndex]);
+
+  const onScraobpxFormChange = async (
+    event: React.ChangeEvent<HTMLTextAreaElement>
+  ) => {
     const src = event.target.value;
-    setSrc(src);
+    setScrapboxSrc(src);
+  };
+
+  const onMarkdownFormChange = async (
+    event: React.ChangeEvent<HTMLTextAreaElement>
+  ) => {
+    const src = event.target.value;
+    setMarkdownSrc(src);
+  };
+
+  const onSrcTabChange = (index: number) => {
+    setSrcTabIndex(index);
+    if ([2, 3].includes(dstTabIndex)) return;
+    switch (index) {
+      case 0:
+        setDstTabIndex(0);
+        break;
+      case 1:
+        setDstTabIndex(1);
+        break;
+      default:
+        break;
+    }
+  };
+  const onDstTabChange = (index: number) => {
+    setDstTabIndex(index);
+    switch (index) {
+      case 0:
+        setSrcTabIndex(0);
+        break;
+      case 1:
+        setSrcTabIndex(1);
+        break;
+      default:
+        break;
+    }
   };
 
   const onCopyClick = () => {
-    copyQuery(src);
+    copyQuery(scrapboxSrc, srcTabIndex);
   };
 
   return (
     <Flex p="2" w="100vw" h="100vh" direction="column">
       <Header />
-      <Heading size="md">Scrapbox To Markdown Converter (alpha)</Heading>
+      <Heading size="md">
+        <Link href={`${location.origin}${location.pathname}`}>
+          Scrapbox To Markdown Converter (alpha)
+        </Link>
+      </Heading>
       <Box m="2">
         <Link href="https://github.com/tkat0/scrapbox-converter" isExternal>
           https://github.com/tkat0/scrapbox-converter{" "}
@@ -107,9 +190,17 @@ function App() {
       </Box>
       <Flex flexGrow={1} flexWrap={"wrap"}>
         <Box flex="1" m="2" minW={"3xs"}>
-          <Tabs display="flex" isFitted h="100%" flexDirection="column">
+          <Tabs
+            display="flex"
+            isFitted
+            h="100%"
+            flexDirection="column"
+            index={srcTabIndex}
+            onChange={onSrcTabChange}
+          >
             <TabList mb="1em" maxH="40px">
               <Tab>Scrapbox</Tab>
+              <Tab>Markdown</Tab>
               <Tooltip label="Copy URL to Clipboard">
                 <IconButton
                   aria-label="Copy URL to Clipboard"
@@ -121,7 +212,10 @@ function App() {
             </TabList>
             <TabPanels flexGrow={1}>
               <TabPanel p="0" h="100%">
-                <Form value={src} onChange={onChange} />
+                <Form value={scrapboxSrc} onChange={onScraobpxFormChange} />
+              </TabPanel>
+              <TabPanel p="0" h="100%">
+                <Form value={markdownSrc} onChange={onMarkdownFormChange} />
               </TabPanel>
             </TabPanels>
           </Tabs>
@@ -132,10 +226,12 @@ function App() {
             isFitted
             h="100%"
             flexDirection="column"
-            onChange={(index) => setTabIndex(index)}
+            index={dstTabIndex}
+            onChange={onDstTabChange}
           >
             <TabList mb="1em" maxH="40px">
               <Tab>Markdown</Tab>
+              <Tab>Scrapbox</Tab>
               <Tab>HTML</Tab>
               <Tab>AST</Tab>
             </TabList>
@@ -144,10 +240,13 @@ function App() {
                 <Form value={dst} />
               </TabPanel>
               <TabPanel p="0" h="100%">
+                <Form value={dst} />
+              </TabPanel>
+              <TabPanel p="0" h="100%">
                 <Preview markdown={dst} />
               </TabPanel>
               <TabPanel p="0" h="100%">
-                <Form value={ast} />
+                <Form value={dst} />
               </TabPanel>
             </TabPanels>
           </Tabs>

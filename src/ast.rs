@@ -215,11 +215,12 @@ impl ExternalLink {
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct Heading {
     pub text: String,
-    pub level: u8,
+    pub level: usize,
 }
 
+// TODO(tkat0): replace &str with Node to support "# `code`"
 impl Heading {
-    pub fn new(text: &str, level: u8) -> Self {
+    pub fn new(text: &str, level: usize) -> Self {
         Self {
             text: text.to_string(),
             level,
@@ -230,13 +231,13 @@ impl Heading {
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct Emphasis {
     pub text: String,
-    pub bold: u8,
-    pub italic: u8,
-    pub strikethrough: u8,
+    pub bold: usize,
+    pub italic: usize,
+    pub strikethrough: usize,
 }
 
 impl Emphasis {
-    pub fn new(text: &str, bold: u8, italic: u8, strikethrough: u8) -> Self {
+    pub fn new(text: &str, bold: usize, italic: usize, strikethrough: usize) -> Self {
         Self {
             text: text.to_string(),
             bold,
@@ -253,7 +254,7 @@ impl Emphasis {
         }
     }
 
-    pub fn bold_level(text: &str, level: u8) -> Self {
+    pub fn bold_level(text: &str, level: usize) -> Self {
         Self {
             text: text.to_string(),
             bold: level,
@@ -280,6 +281,7 @@ impl Emphasis {
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct Image {
+    // TODO(tkat0): title
     pub uri: String,
 }
 
