@@ -6,7 +6,7 @@ use nom::{
     multi::{many0, many1},
     sequence::delimited,
     sequence::terminated,
-    Err,
+    Err, InputTake, Slice,
 };
 
 use super::error::*;
@@ -93,15 +93,22 @@ fn external_link(input: Span) -> IResult<ExternalLink> {
     // [Rust https://www.rust-lang.org/]
     // [Rust Rust Rust https://www.rust-lang.org/]
     // [Rust　Rust　Rust　https://www.rust-lang.org/]
+    // [Rust https://www.rust-lang.org/ https://www.rust-lang.org/]
     fn title_url(input: Span) -> IResult<ExternalLink> {
-        let (input, title) = alt((
-            take_until(" https://"),
-            take_until(" http://"),
-            take_until("　https://"),
-            take_until("　http://"),
-        ))(input)?;
+        let (link, title) = {
+            let mut index = 0;
+            for i in (0..input.len()).rev() {
+                let e = input.slice(i..i + 1);
+                if *e == " " || *e == "　" {
+                    index = i;
+                    break;
+                }
+            }
+            input.take_split(index)
+        };
+
         let title = if title.is_empty() { None } else { Some(title) };
-        let (input, _) = space1(input)?;
+        let (input, _) = space1(link)?;
         let (rest, url) = url(input)?;
         assert!(rest.is_empty());
         Ok((rest, ExternalLink::new(title.map(|s: Span| *s), &url)))
@@ -387,6 +394,7 @@ mod test {
         case("[Rustプログラミング言語 https://www.rust-lang.org/]", ("", ExternalLink::new(Some("Rustプログラミング言語"), "https://www.rust-lang.org/"))),
         // Scrapbox actually doesn't parse this
         case("[ https://www.rust-lang.org/ Rust ]", ("", ExternalLink::new(Some("Rust "), "https://www.rust-lang.org/"))),
+        case("[Rust https://www.rust-lang.org/ https://www.rust-lang.org/]", ("", ExternalLink::new(Some("Rust https://www.rust-lang.org/"), "https://www.rust-lang.org/"))),
     )]
     fn external_link_valid_test(input: &str, expected: (&str, ExternalLink)) {
         assert_eq!(
