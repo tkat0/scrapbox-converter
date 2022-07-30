@@ -169,14 +169,17 @@ fn emphasis(input: Span) -> IResult<Emphasis> {
         }
     }
 
-    Ok((input, Emphasis::new(*text, bold, italic, strikethrough)))
+    Ok((
+        input,
+        Emphasis::new(text.trim(), bold, italic, strikethrough),
+    ))
 }
 
 // [[bold]]
 fn bold(input: Span) -> IResult<Emphasis> {
     map(
         delimited(tag("[["), take_while(|c| c != ']'), tag("]]")),
-        |s: Span| Emphasis::bold(*s),
+        |s: Span| Emphasis::bold(s.trim()),
     )(input)
 }
 
@@ -184,7 +187,7 @@ fn bold(input: Span) -> IResult<Emphasis> {
 fn math(input: Span) -> IResult<Math> {
     map(
         delimited(tag("[$"), take_while(|c| c != ']'), char(']')),
-        |s: Span| Math::new(*s),
+        |s: Span| Math::new(s.trim()),
     )(input)
 }
 
@@ -342,6 +345,7 @@ mod test {
         case("[***** text]", ("", Emphasis::bold_level("text", 5))),
         case("[/ text]", ("", Emphasis::italic("text"))),
         case("[*/*-* text]", ("", Emphasis::new("text", 3, 1, 1))),
+        case("[*/*-*  text　]", ("", Emphasis::new("text", 3, 1, 1))),
     )]
     fn emphasis_valid_test(input: &str, expected: (&str, Emphasis)) {
         assert_eq!(
@@ -352,6 +356,7 @@ mod test {
 
     #[rstest(input, expected,
         case("[[text]]", ("", Emphasis::bold_level("text", 1))),
+        case("[[ text　]]", ("", Emphasis::bold_level("text", 1))),
     )]
     fn bold_valid_test(input: &str, expected: (&str, Emphasis)) {
         assert_eq!(
@@ -404,7 +409,7 @@ mod test {
     }
 
     #[rstest(input, expected,
-        case(r#"[$ \frac{-b \pm \sqrt{b^2-4ac}}{2a} ]"#, ("", Math::new(r#" \frac{-b \pm \sqrt{b^2-4ac}}{2a} "#))),
+        case(r#"[$ \frac{-b \pm \sqrt{b^2-4ac}}{2a} ]"#, ("", Math::new(r#"\frac{-b \pm \sqrt{b^2-4ac}}{2a}"#))),
     )]
     fn math_valid_test(input: &str, expected: (&str, Math)) {
         assert_eq!(
@@ -417,7 +422,7 @@ mod test {
         case("abc #tag ", ("#tag ", Node::new(NodeKind::Text(Text::new("abc "))))),
         case("[title]abc", ("abc", Node::new(NodeKind::InternalLink(InternalLink::new("title"))))),
         case("[", ("", Node::new(NodeKind::Text(Text::new("["))))),
-        case(r#"[$ \frac{-b \pm \sqrt{b^2-4ac}}{2a} ]"#, ("", Node::new(NodeKind::Math(Math::new(r#" \frac{-b \pm \sqrt{b^2-4ac}}{2a} "#))))),
+        case(r#"[$ \frac{-b \pm \sqrt{b^2-4ac}}{2a} ]"#, ("", Node::new(NodeKind::Math(Math::new(r#"\frac{-b \pm \sqrt{b^2-4ac}}{2a}"#))))),
     )]
     fn node_valid_test(input: &str, expected: (&str, Node)) {
         assert_eq!(
