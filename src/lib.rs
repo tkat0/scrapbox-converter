@@ -2,11 +2,11 @@ use parser::scrapbox::page;
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
-mod ast;
-mod parser;
-mod visitor;
+pub mod ast;
+pub mod parser;
+pub mod visitor;
 
-use parser::Span;
+pub use parser::Span;
 use visitor::{
     markdown_printer::{MarkdownPass, MarkdownPrinter, MarkdownPrinterConfig},
     scrapbox_printer::{ScrapboxPrinter, ScrapboxPrinterConfig},
