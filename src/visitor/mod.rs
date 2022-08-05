@@ -1,3 +1,5 @@
+use std::borrow::BorrowMut;
+
 use crate::ast::*;
 
 pub mod markdown_printer;
@@ -84,22 +86,26 @@ fn walk_page<V: Visitor>(visitor: &mut V, value: &mut Page) {
 }
 
 fn walk_node<V: Visitor>(visitor: &mut V, value: &mut Node) {
-    let command = match value.kind.clone() {
-        NodeKind::Paragraph(mut v) => visitor.visit_paragraph(&mut v),
-        NodeKind::List(mut v) => visitor.visit_list(&mut v),
-        NodeKind::HashTag(v) => visitor.visit_hashtag(&v),
-        NodeKind::InternalLink(v) => visitor.visit_internal_link(&v),
-        NodeKind::ExternalLink(v) => visitor.visit_external_link(&v),
-        NodeKind::Emphasis(v) => visitor.visit_emphasis(&v),
-        NodeKind::Heading(v) => visitor.visit_heading(&v),
-        NodeKind::BlockQuate(v) => visitor.visit_block_quate(&v),
-        NodeKind::CodeBlock(v) => visitor.visit_code_block(&v),
-        NodeKind::Table(v) => visitor.visit_table(&v),
-        NodeKind::Image(v) => visitor.visit_image(&v),
-        NodeKind::Math(v) => visitor.visit_math(&v),
-        NodeKind::Text(v) => visitor.visit_text(&v),
+    let command = match value.kind.borrow_mut() {
+        NodeKind::Paragraph(v) => visitor.visit_paragraph(v),
+        NodeKind::List(v) => visitor.visit_list(v),
+        NodeKind::HashTag(v) => visitor.visit_hashtag(v),
+        NodeKind::InternalLink(v) => visitor.visit_internal_link(v),
+        NodeKind::ExternalLink(v) => visitor.visit_external_link(v),
+        NodeKind::Emphasis(v) => visitor.visit_emphasis(v),
+        NodeKind::Heading(v) => visitor.visit_heading(v),
+        NodeKind::BlockQuate(v) => visitor.visit_block_quate(v),
+        NodeKind::CodeBlock(v) => visitor.visit_code_block(v),
+        NodeKind::Table(v) => visitor.visit_table(v),
+        NodeKind::Image(v) => visitor.visit_image(v),
+        NodeKind::Math(v) => visitor.visit_math(v),
+        NodeKind::Text(v) => visitor.visit_text(v),
         NodeKind::Nop => None,
     };
+
+    if let Some(command) = &command {
+        log::debug!("command: {:?}", command);
+    }
 
     match command {
         Some(TransformCommand::Replace(kind)) => value.kind = kind,
