@@ -304,6 +304,20 @@ impl Math {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct HtmlTag {
+    /// "<tag>", "<tag />", "</tag>"
+    pub value: String,
+}
+
+impl HtmlTag {
+    pub fn new(value: &str) -> Self {
+        Self {
+            value: value.into(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
