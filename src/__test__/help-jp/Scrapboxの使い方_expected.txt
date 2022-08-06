@@ -1,0 +1,46 @@
+Scrapboxの使い方
+Scrapboxへようこそ。このページは自由に編集して活用できます。
+
+このプロジェクトにメンバーを招待しましょう
+* Menu -> Settings から他の人を招待できるリンクを取得できます。
+* Scrapboxでは同一ページを複数人でリアルタイムに共同編集できます。
+
+基本的な使い方を試してみよう
+* 行頭にスペースまたはタブを入れて段落を作ることができます。
+* `[ ]` で囲むと[[別ページ]]への[[リンク]]になります。
+* `#` のあとに書いた文字は #ハッシュタグ になります。動作はリンクと同じです。
+* `[ ]` の中にGyazoなどの画像URLやYoutube/Vimeoの動画URLを書くと画像や動画を表示できます。
+  * 例:
+    * ![](https://gyazo.com/5f93e65a3b979ae5333aca4f32600611/max_size/400)
+* 個人のプロフィールを設定して自分のページを作りましょう（Menu -> Edit profile）。その後、
+  * `Ctrl+I`を入力、または `[自分のユーザー名.icon]` を書くとアイコンを埋め込めます。
+  * 自分のページだけでなく、あらゆるページをアイコン化できます。例: [[Scrapboxの使い方.icon]]
+* すべての記法は、[/help-jp/記法](https://scrapbox.io/help-jp/記法)をご覧ください
+
+リンクの効果的な使い方
+* [[Scrapbox]]は、[[リンク]]から[[つながり]]を作ることで、関連するものを見つけ出し、整理できるのが特長です。
+  * [[読んだ本]]、[[人物]]、[[タスク]]など[[自由]]にリンクやハッシュタグを作っていきましょう！
+
+ページをトップに固定する (ピン留め)
+* 右上のメニューから`Pin at home`を選択すると、ページをリストの一番上に固定できます。
+* ![](https://gyazo.com/c3a68ab8928396608ef24349051c9d71/max_size/400)
+* `Pin at home`には様々な活用方法があります。
+  * 自己紹介やプロジェクトの目的を書く
+  * 最初に読んでほしいページを目立たせる
+  * 招待URLを公開し、共同編集者を広く募る
+  * 新規投稿用のテンプレートを置く
+
+詳しい使い方
+* [/help-jp/](https://scrapbox.io/help-jp/)をご覧ください。
+* 英語版は[/help/](https://scrapbox.io/help/)にあります。
+
+質問がある場合
+* [お問い合わせ](https://scrapbox.io/contact) からどうぞ。ご要望は[/forum-jp](https://scrapbox.io/forum-jp)でも受け付けています。
+
+使い方のサンプルが見たい
+* [/help-jp/サンプル](https://scrapbox.io/help-jp/サンプル)を複数掲載しています
+
+企業でご利用の方へ
+* Nota社の社内利用の実例が[/nota-private-sample](https://scrapbox.io/nota-private-sample)にあります
+* [企業の利用事例を掲載しています](https://scrapbox.io/business)
+* [Scrapboxの企業での使い道](https://scrapbox.io/business/how-it-works)
