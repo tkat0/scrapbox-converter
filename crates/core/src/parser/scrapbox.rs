@@ -68,10 +68,15 @@ fn internal_link(input: Span) -> IResult<InternalLink> {
 
 // [/help-jp/Scrapbox]
 fn external_link_other_project(input: Span) -> IResult<ExternalLink> {
-    map(
-        delimited(tag("[/"), take_while(|c| c != ']'), char(']')),
-        |s: Span| ExternalLink::new(None, &format!("https://scrapbox.io/{}", *s)),
-    )(input)
+    let (input, title) = brackets(input)?;
+    let (title, _) = tag("/")(title)?;
+    Ok((
+        input,
+        ExternalLink::new(
+            Some(&format!("/{}", title)),
+            &format!("https://scrapbox.io/{}", title),
+        ),
+    ))
 }
 
 /// [https://www.rust-lang.org/] or [https://www.rust-lang.org/ Rust] or [Rust https://www.rust-lang.org/]
@@ -389,7 +394,7 @@ mod test {
     }
 
     #[rstest(input, expected,
-        case("[/help-jp/Scrapbox]", ("", ExternalLink::new(None, "https://scrapbox.io/help-jp/Scrapbox"))),
+        case("[/help-jp/Scrapbox]", ("", ExternalLink::new(Some("/help-jp/Scrapbox"), "https://scrapbox.io/help-jp/Scrapbox"))),
     )]
     fn external_link_other_project_valid_test(input: &str, expected: (&str, ExternalLink)) {
         assert_eq!(
