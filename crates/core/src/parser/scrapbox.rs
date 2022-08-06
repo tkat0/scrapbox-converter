@@ -483,18 +483,15 @@ mod test {
             abc
             #efg [internal link][https://www.rust-lang.org/]
             [別ページ]
+            aaa`code`bbb
         "}, ("", Page {
             nodes: vec![
                 Node::new(NodeKind::Paragraph(Paragraph::new(vec![
-                        Node::new(NodeKind::Text(Text {
-                        value: "abc".into(),
-                    }))
+                        Node::new(NodeKind::Text(Text::new("abc"))),
                 ]))),
                 Node::new(NodeKind::Paragraph(Paragraph::new(vec![
-                        Node::new(NodeKind::HashTag(HashTag {
-                            value: "efg".into(),
-                        })),
-                        Node::new(NodeKind::Text(Text { value: " ".into() })),
+                        Node::new(NodeKind::HashTag(HashTag::new("efg"))),
+                        Node::new(NodeKind::Text(Text::new(" "))),
                         Node::new(NodeKind::InternalLink(InternalLink::new("internal link"))),
                         Node::new(NodeKind::ExternalLink(ExternalLink::new(
                             None,
@@ -503,6 +500,11 @@ mod test {
                 ]))),
                 Node::new(NodeKind::Paragraph(Paragraph::new(vec![
                         Node::new(NodeKind::InternalLink(InternalLink::new("別ページ")))
+                ]))),
+                Node::new(NodeKind::Paragraph(Paragraph::new(vec![
+                        Node::new(NodeKind::Text(Text::new("aaa"))),
+                        Node::new(NodeKind::BlockQuate(BlockQuate::new("code"))),
+                        Node::new(NodeKind::Text(Text::new("bbb"))),
                 ]))),
             ]
         })),

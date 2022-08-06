@@ -92,6 +92,7 @@ pub fn text<X: Clone + Copy>(input: Span<X>) -> IResult<Text, X> {
         peek(take_until_tag)(input),
         peek(take_until_bracket)(input),
         peek(take_until_eol)(input),
+        peek(take_until("`"))(input),
     ];
 
     let ret = ret
@@ -217,6 +218,7 @@ mod test {
         case(" [ #tag", ("[ #tag", Text::new(" "))),
         case(" [url]", ("[url]", Text::new(" "))),
         case(" \n", ("\n", Text::new(" "))),
+        case("abc`aaa`", ("`aaa`", Text::new("abc"))),
         case("abc#tag", ("", Text::new("abc#tag"))),
         case("abc #tag", ("#tag", Text::new("abc "))),
         case("あいう", ("", Text::new("あいう"))),
