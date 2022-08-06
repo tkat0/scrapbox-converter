@@ -108,7 +108,12 @@ impl Visitor for MarkdownPrinter {
             self.document
                 .push_str(&format!("[{}]({})", title, value.url));
         } else {
-            self.document.push_str(&format!("{}", value.url));
+            if value.url.starts_with("https://gyazo.com/") {
+                self.document
+                    .push_str(&format!("![]({}/max_size/400)", value.url));
+            } else {
+                self.document.push_str(&format!("{}", value.url));
+            }
         }
         None
     }
@@ -281,6 +286,12 @@ mod test {
                 Node::new(NodeKind::Paragraph(Paragraph::new(vec![Node::new(
                     NodeKind::Math(Math::new(r#"\frac{-b \pm \sqrt{b^2-4ac}}{2a}"#)),
                 )]))),
+                Node::new(NodeKind::Paragraph(Paragraph::new(vec![Node::new(
+                    NodeKind::ExternalLink(ExternalLink::new(
+                        None,
+                        "https://gyazo.com/5f93e65a3b979ae5333aca4f32600611",
+                    )),
+                )]))),
             ],
         };
 
@@ -306,6 +317,7 @@ mod test {
 
 
             $$\frac{-b \pm \sqrt{b^2-4ac}}{2a}$$
+            ![](https://gyazo.com/5f93e65a3b979ae5333aca4f32600611/max_size/400)
         "#};
 
         assert_eq!(markdown, expected)
