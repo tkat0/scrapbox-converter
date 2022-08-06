@@ -135,7 +135,7 @@ impl Visitor for MarkdownPrinter {
 
     fn visit_heading(&mut self, value: &Heading) -> Option<TransformCommand> {
         self.document.push_str(&format!(
-            "{} {}\n",
+            "{} {}",
             "#".repeat(value.level as usize),
             value.text
         ));
