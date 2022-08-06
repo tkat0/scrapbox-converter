@@ -6,7 +6,7 @@ use nom::{
     multi::{many0, many1},
     sequence::delimited,
     sequence::terminated,
-    Err, InputTake, Slice,
+    Err, InputTake,
 };
 
 use super::error::*;
@@ -96,15 +96,14 @@ fn external_link(input: Span) -> IResult<ExternalLink> {
     // [Rust https://www.rust-lang.org/ https://www.rust-lang.org/]
     fn title_url(input: Span) -> IResult<ExternalLink> {
         let (link, title) = {
-            let mut index = 0;
-            for i in (0..input.len()).rev() {
-                let e = input.slice(i..i + 1);
-                if *e == " " || *e == "　" {
-                    index = i;
+            let mut bytes = 0;
+            for c in input.chars().rev() {
+                bytes += c.len_utf8();
+                if c == ' ' || c == '　' {
                     break;
                 }
             }
-            input.take_split(index)
+            input.take_split(input.bytes().count() - bytes)
         };
 
         let title = if title.is_empty() { None } else { Some(title) };
@@ -367,6 +366,7 @@ mod test {
 
     #[rstest(input, expected,
         case("[title]", ("", InternalLink::new("title"))),
+        case("[別ページ]", ("", InternalLink::new("別ページ"))),
     )]
     fn internal_link_valid_test(input: &str, expected: (&str, InternalLink)) {
         assert_eq!(
@@ -468,6 +468,7 @@ mod test {
         case(indoc! {"
             abc
             #efg [internal link][https://www.rust-lang.org/]
+            [別ページ]
         "}, ("", Page {
             nodes: vec![
                 Node::new(NodeKind::Paragraph(Paragraph::new(vec![
@@ -485,6 +486,9 @@ mod test {
                             None,
                             "https://www.rust-lang.org/",
                         ))),
+                ]))),
+                Node::new(NodeKind::Paragraph(Paragraph::new(vec![
+                        Node::new(NodeKind::InternalLink(InternalLink::new("別ページ")))
                 ]))),
             ]
         })),
