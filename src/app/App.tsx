@@ -99,7 +99,7 @@ function App() {
           setDst(dst);
         },
         () => {
-          const dst = scrapboxToAST(scrapboxSrc);
+          const dst = scrapboxToAST(scrapboxSrc, config);
           setDst(dst);
         },
       ],
@@ -107,7 +107,7 @@ function App() {
         // markdown to
         null,
         () => {
-          const dst = markdownToScrapbox(markdownSrc);
+          const dst = markdownToScrapbox(markdownSrc, config);
           setDst(dst);
         },
         () => {
@@ -115,7 +115,7 @@ function App() {
           setDst(markdownSrc);
         },
         () => {
-          const dst = markdownToAST(markdownSrc);
+          const dst = markdownToAST(markdownSrc, config);
           setDst(dst);
         },
       ],

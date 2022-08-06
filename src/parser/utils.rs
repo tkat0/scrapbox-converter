@@ -11,21 +11,21 @@ use crate::ast::*;
 
 use super::*;
 
-pub fn take_until_eol(input: Span) -> IResult<Span> {
+pub fn take_until_eol<X: Clone>(input: Span<X>) -> IResult<Span<X>, X> {
     alt((take_until("\n"), take(input.len())))(input)
 }
 
 // [abc]
-pub fn brackets(input: Span) -> IResult<Span> {
+pub fn brackets<X: Clone>(input: Span<X>) -> IResult<Span<X>, X> {
     delimited(char('['), take_while(|c| c != ']'), char(']'))(input)
 }
 
 // (abc)
-pub fn parentheses(input: Span) -> IResult<Span> {
+pub fn parentheses<X: Clone>(input: Span<X>) -> IResult<Span<X>, X> {
     delimited(char('('), take_while(|c| c != ')'), char(')'))(input)
 }
 
-pub fn url(input: Span) -> IResult<String> {
+pub fn url<X: Clone>(input: Span<X>) -> IResult<String, X> {
     let (url, protocol) = alt((tag("https://"), tag("http://")))(input)?;
 
     fn is_token(c: char) -> bool {
@@ -41,12 +41,12 @@ pub fn url(input: Span) -> IResult<String> {
 }
 
 // https://www.rust-lang.org/
-pub fn external_link_plain(input: Span) -> IResult<ExternalLink> {
+pub fn external_link_plain<X: Clone>(input: Span<X>) -> IResult<ExternalLink, X> {
     map(url, |s| ExternalLink::new(None, &s))(input)
 }
 
 /// #tag
-pub fn hashtag(input: Span) -> IResult<HashTag> {
+pub fn hashtag<X: Clone>(input: Span<X>) -> IResult<HashTag, X> {
     let terminators = vec![" ", "　", "\n"];
 
     // TODO(tkat0): "#[tag]" -> Error
@@ -57,11 +57,11 @@ pub fn hashtag(input: Span) -> IResult<HashTag> {
             tag("#"),
             take_while(move |c: char| !terminators.contains(&c.to_string().as_str())),
         ),
-        |s: Span| HashTag::new(*s),
+        |s: Span<X>| HashTag::new(*s),
     )(input)
 }
 
-pub fn text(input: Span) -> IResult<Text> {
+pub fn text<X: Clone + Copy>(input: Span<X>) -> IResult<Text, X> {
     if input.is_empty() {
         return Err(Err::Error(ParseError::new(input, "".into())));
     }
@@ -75,14 +75,14 @@ pub fn text(input: Span) -> IResult<Text> {
     }
 
     // "abc #tag" -> ("#tag", "abc ")
-    fn take_until_tag(input: Span) -> IResult<Span> {
+    fn take_until_tag<X: Clone>(input: Span<X>) -> IResult<Span<X>, X> {
         // " #tag" -> ("#tag", " ")
         // allow "abc#tag"
         let (input, _) = peek(take_until(" #"))(input)?;
         take_until("#")(input)
     }
 
-    fn take_until_bracket(input: Span) -> IResult<Span> {
+    fn take_until_bracket<X: Clone>(input: Span<X>) -> IResult<Span<X>, X> {
         take_while(|c| c != '[')(input)
     }
 
@@ -118,18 +118,18 @@ pub fn text(input: Span) -> IResult<Text> {
 }
 
 /// `block_quate`
-pub fn block_quate(input: Span) -> IResult<BlockQuate> {
+pub fn block_quate<X: Clone>(input: Span<X>) -> IResult<BlockQuate, X> {
     map(
         delimited(char('`'), take_while(|c| c != '`'), char('`')),
-        |s: Span| BlockQuate::new(*s),
+        |s: Span<X>| BlockQuate::new(*s),
     )(input)
 }
 
-pub fn space0(input: Span) -> IResult<Span> {
+pub fn space0<X: Clone>(input: Span<X>) -> IResult<Span<X>, X> {
     take_while(is_space)(input)
 }
 
-pub fn space1(input: Span) -> IResult<Span> {
+pub fn space1<X: Clone>(input: Span<X>) -> IResult<Span<X>, X> {
     take_while1(is_space)(input)
 }
 

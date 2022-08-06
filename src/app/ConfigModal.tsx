@@ -1,4 +1,4 @@
-import { Config } from "@@/scrapbox_converter_core";
+import { Config, IndentKind } from "@@/scrapbox_converter_core";
 import {
   Box,
   Button,
@@ -28,6 +28,7 @@ import React from "react";
 export const defaultConfig: Config = {
   heading1Mapping: 4,
   boldToHeading: false,
+  indent: { type: "Space", size: 2 },
 };
 
 interface ConfigModalProps {
@@ -52,6 +53,7 @@ export const ConfigModal: React.FC<ConfigModalProps> = (props) => {
           <ModalHeader>Configuration</ModalHeader>
           <ModalCloseButton />
           <ModalBody>
+            <Heading size="md">Scrapbox to Markdown</Heading>
             <ConfigHeader
               value={config.heading1Mapping}
               defaultValue={defaultConfig.heading1Mapping}
@@ -65,6 +67,18 @@ export const ConfigModal: React.FC<ConfigModalProps> = (props) => {
               defaultValue={defaultConfig.boldToHeading}
               setValue={(value) => {
                 setConfig({ ...config, boldToHeading: value });
+              }}
+            />
+            <Divider />
+
+            <Heading size="md" marginTop={"8"}>
+              Markdown to Scrapbox
+            </Heading>
+            <ConfigIndent
+              value={config.indent}
+              defaultValue={defaultConfig.indent}
+              setValue={(value) => {
+                setConfig({ ...config, indent: value });
               }}
             />
           </ModalBody>
@@ -134,6 +148,55 @@ function ConfigBold(props: ConfigProps<boolean>) {
   );
 }
 
+function ConfigIndent(props: ConfigProps<IndentKind>) {
+  const { value, setValue, defaultValue } = props;
+  const useTab = value.type == "Tab";
+  return (
+    <ConfigRow
+      title={"Indent of markdown list"}
+      descriptions={[`space or tab`]}
+      defaultValue={defaultValue}
+      setValue={setValue}
+    >
+      <Heading size="sm">use Tab</Heading>
+      <Switch
+        size="sm"
+        isChecked={useTab}
+        onChange={() => {
+          if (useTab) {
+            setValue({ type: "Space", size: 2 });
+          } else {
+            setValue({ type: "Tab" });
+          }
+        }}
+      />
+      {!useTab && (
+        <>
+          <Heading size="sm">size</Heading>
+          <NumberInput
+            defaultValue={value.size}
+            min={1}
+            max={8}
+            size="sm"
+            onChange={(value) => {
+              const v = parseInt(value);
+              if (1 <= v && v <= 8) {
+                setValue({ type: "Space", size: parseInt(value) });
+              }
+            }}
+          >
+            <NumberInputField size={1} />
+            <NumberInputStepper>
+              <NumberIncrementStepper />
+              <NumberDecrementStepper />
+            </NumberInputStepper>
+          </NumberInput>
+        </>
+      )}
+    </ConfigRow>
+  );
+}
+
 interface ConfigRowProps<T> {
   title: string;
   descriptions: string[];
@@ -145,7 +208,7 @@ interface ConfigRowProps<T> {
 function ConfigRow<T>(props: ConfigRowProps<T>) {
   const { title, descriptions, defaultValue, setValue, children } = props;
   return (
-    <Flex alignItems={"center"} gap={"2"} m="2">
+    <Flex gap={"2"} m="2">
       <Box>
         <Heading size="sm">{title}</Heading>
         {descriptions.map((d, i) => {
@@ -159,7 +222,7 @@ function ConfigRow<T>(props: ConfigRowProps<T>) {
       <Spacer />
       <Box>{children}</Box>
       <Box>
-        <Tooltip label={`default: ${defaultValue}`}>
+        <Tooltip label={`default: ${JSON.stringify(defaultValue)}`}>
           <Button
             size="sm"
             onClick={() => {

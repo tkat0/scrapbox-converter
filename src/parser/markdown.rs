@@ -8,10 +8,40 @@ use nom::{
     sequence::terminated,
     Err,
 };
+use serde::{Deserialize, Serialize};
 
-use super::error::*;
 use super::utils::*;
+use super::{error, ParseError};
 use crate::ast::*;
+
+pub type Span<'a> = error::Span<'a, MarkdownParserContext>;
+pub type IResult<'a, O> = error::IResult<'a, O, MarkdownParserContext>;
+
+#[derive(Default, Debug, Copy, Clone, PartialEq)]
+pub struct MarkdownParserContext {
+    pub config: MarkdownParserConfig,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum IndentKind {
+    Tab,
+    Space { size: usize },
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct MarkdownParserConfig {
+    /// indent size of markdown list
+    pub indent: IndentKind,
+}
+
+impl Default for MarkdownParserConfig {
+    fn default() -> Self {
+        Self {
+            indent: IndentKind::Space { size: 4 },
+        }
+    }
+}
 
 pub fn page(input: Span) -> IResult<Page> {
     let (input, nodes) = many0(alt((
@@ -202,8 +232,12 @@ fn table(input: Span) -> IResult<Table> {
 }
 
 fn list_item(input: Span) -> IResult<ListItem> {
-    // TODO(tkat0): indent size and variation
-    let (input, tabs) = many0(tag("  "))(input)?;
+    let indent = match input.extra.config.indent {
+        IndentKind::Tab => "\t".into(),
+        IndentKind::Space { size } => " ".repeat(size),
+    };
+
+    let (input, tabs) = many0(tag(indent.as_str()))(input)?;
     let level = tabs.len();
 
     fn decimal(input: Span) -> IResult<(ListKind, Vec<Node>)> {
@@ -231,14 +265,19 @@ mod test {
     use indoc::indoc;
     use rstest::rstest;
 
-    #[rstest(input, expected,
-        case("    * 123abc\n", ("", List::new(vec![ListItem::new(ListKind::Disc, 2, vec![Node::new(NodeKind::Text(Text::new("123abc")))])]))),
-        case("* 123abc\n", ("", List::new(vec![ListItem::new(ListKind::Disc, 0, vec![Node::new(NodeKind::Text(Text::new("123abc")))])]))),
-        case("  123. abc\n", ("", List::new(vec![ListItem::new(ListKind::Decimal, 1, vec![Node::new(NodeKind::Text(Text::new("abc")))])]))),
+    #[rstest(input, indent, expected,
+        case("    * 123abc\n", IndentKind::Space { size: 2}, ("", List::new(vec![ListItem::new(ListKind::Disc, 2, vec![Node::new(NodeKind::Text(Text::new("123abc")))])]))),
+        case("* 123abc\n", IndentKind::Space { size: 2}, ("", List::new(vec![ListItem::new(ListKind::Disc, 0, vec![Node::new(NodeKind::Text(Text::new("123abc")))])]))),
+        case("  123. abc\n", IndentKind::Space { size: 2}, ("", List::new(vec![ListItem::new(ListKind::Decimal, 1, vec![Node::new(NodeKind::Text(Text::new("abc")))])]))),
+        case("    * 123abc\n", IndentKind::Space { size: 4}, ("", List::new(vec![ListItem::new(ListKind::Disc, 1, vec![Node::new(NodeKind::Text(Text::new("123abc")))])]))),
+        case("        * 123abc\n", IndentKind::Space { size: 4}, ("", List::new(vec![ListItem::new(ListKind::Disc, 2, vec![Node::new(NodeKind::Text(Text::new("123abc")))])]))),
+        case("\t\t* 123abc\n", IndentKind::Tab, ("", List::new(vec![ListItem::new(ListKind::Disc, 2, vec![Node::new(NodeKind::Text(Text::new("123abc")))])]))),
     )]
-    fn list_valid_test(input: &str, expected: (&str, List)) {
+    fn list_valid_test(input: &str, indent: IndentKind, expected: (&str, List)) {
+        let config = MarkdownParserConfig { indent };
         assert_eq!(
-            list(Span::new(input)).map(|(input, ret)| (*input, ret)),
+            list(Span::new_extra(input, MarkdownParserContext { config }))
+                .map(|(input, ret)| (*input, ret)),
             Ok(expected)
         );
     }
@@ -248,7 +287,8 @@ mod test {
     )]
     fn code_block_valid_test(input: &str, expected: (&str, CodeBlock)) {
         assert_eq!(
-            code_block(Span::new(input)).map(|(input, ret)| (*input, ret)),
+            code_block(Span::new_extra(input, MarkdownParserContext::default()))
+                .map(|(input, ret)| (*input, ret)),
             Ok(expected)
         );
     }
@@ -259,7 +299,8 @@ mod test {
     )]
     fn table_valid_test(input: &str, expected: (&str, Table)) {
         assert_eq!(
-            table(Span::new(input)).map(|(input, ret)| (*input, ret)),
+            table(Span::new_extra(input, MarkdownParserContext::default()))
+                .map(|(input, ret)| (*input, ret)),
             Ok(expected)
         );
     }
@@ -270,7 +311,8 @@ mod test {
     )]
     fn image_valid_test(input: &str, expected: (&str, Image)) {
         assert_eq!(
-            image(Span::new(input)).map(|(input, ret)| (*input, ret)),
+            image(Span::new_extra(input, MarkdownParserContext::default()))
+                .map(|(input, ret)| (*input, ret)),
             Ok(expected)
         );
     }
@@ -281,7 +323,8 @@ mod test {
     )]
     fn heading_valid_test(input: &str, expected: (&str, Heading)) {
         assert_eq!(
-            heading(Span::new(input)).map(|(input, ret)| (*input, ret)),
+            heading(Span::new_extra(input, MarkdownParserContext::default()))
+                .map(|(input, ret)| (*input, ret)),
             Ok(expected)
         );
     }
@@ -294,7 +337,8 @@ mod test {
     )]
     fn emphasis_valid_test(input: &str, expected: (&str, Emphasis)) {
         assert_eq!(
-            emphasis(Span::new(input)).map(|(input, ret)| (*input, ret)),
+            emphasis(Span::new_extra(input, MarkdownParserContext::default()))
+                .map(|(input, ret)| (*input, ret)),
             Ok(expected)
         );
     }
@@ -304,7 +348,8 @@ mod test {
     )]
     fn internal_link_valid_test(input: &str, expected: (&str, InternalLink)) {
         assert_eq!(
-            internal_link(Span::new(input)).map(|(input, ret)| (*input, ret)),
+            internal_link(Span::new_extra(input, MarkdownParserContext::default()))
+                .map(|(input, ret)| (*input, ret)),
             Ok(expected)
         );
     }
@@ -314,7 +359,8 @@ mod test {
     )]
     fn image_internal_link_valid_test(input: &str, expected: (&str, Image)) {
         assert_eq!(
-            image_internal_link(Span::new(input)).map(|(input, ret)| (*input, ret)),
+            image_internal_link(Span::new_extra(input, MarkdownParserContext::default()))
+                .map(|(input, ret)| (*input, ret)),
             Ok(expected)
         );
     }
@@ -325,7 +371,8 @@ mod test {
     )]
     fn external_link_valid_test(input: &str, expected: (&str, ExternalLink)) {
         assert_eq!(
-            external_link(Span::new(input)).map(|(input, ret)| (*input, ret)),
+            external_link(Span::new_extra(input, MarkdownParserContext::default()))
+                .map(|(input, ret)| (*input, ret)),
             Ok(expected)
         );
     }
@@ -335,7 +382,8 @@ mod test {
     )]
     fn math_valid_test(input: &str, expected: (&str, Math)) {
         assert_eq!(
-            math(Span::new(input)).map(|(input, ret)| (*input, ret)),
+            math(Span::new_extra(input, MarkdownParserContext::default()))
+                .map(|(input, ret)| (*input, ret)),
             Ok(expected)
         );
     }
@@ -348,14 +396,15 @@ mod test {
     )]
     fn node_valid_test(input: &str, expected: (&str, Node)) {
         assert_eq!(
-            node(Span::new(input)).map(|(input, ret)| (*input, ret)),
+            node(Span::new_extra(input, MarkdownParserContext::default()))
+                .map(|(input, ret)| (*input, ret)),
             Ok(expected)
         );
     }
 
     #[rstest(input, case(""), case("\n"))]
     fn node_invalid_test(input: &str) {
-        if let Ok(ok) = text(Span::new(input)) {
+        if let Ok(ok) = text(Span::new_extra(input, MarkdownParserContext::default())) {
             panic!("{:?}", ok)
         }
     }
@@ -376,7 +425,7 @@ mod test {
     )]
     fn paragraph_valid_test(input: &str, expected: (&str, Paragraph)) {
         assert_eq!(
-            paragraph(Span::new(input)).map(|(input, ret)| (*input, ret)),
+            paragraph(Span::new_extra(input, Context::default())).map(|(input, ret)| (*input, ret)),
             Ok(expected)
         );
     }
@@ -428,7 +477,8 @@ mod test {
     )]
     fn page_valid_test(input: &str, expected: (&str, Page)) {
         assert_eq!(
-            page(Span::new(input)).map(|(input, ret)| (*input, ret)),
+            page(Span::new_extra(input, MarkdownParserContext::default()))
+                .map(|(input, ret)| (*input, ret)),
             Ok(expected)
         );
     }

@@ -21,27 +21,27 @@ export const scrapboxToMarkdown = (input: string, config: Config): string => {
   }
 };
 
-export const scrapboxToAST = (input: string): string => {
+export const scrapboxToAST = (input: string, config: Config): string => {
   try {
-    return scrapboxToASTCore(input);
+    return scrapboxToASTCore(input, config);
   } catch (error) {
     console.error(error);
     return "";
   }
 };
 
-export const markdownToScrapbox = (input: string): string => {
+export const markdownToScrapbox = (input: string, config: Config): string => {
   try {
-    return markdownToScrapboxCore(input);
+    return markdownToScrapboxCore(input, config);
   } catch (error) {
     console.error(error);
     return "";
   }
 };
 
-export const markdownToAST = (input: string): string => {
+export const markdownToAST = (input: string, config: Config): string => {
   try {
-    return markdownToASTCore(input);
+    return markdownToASTCore(input, config);
   } catch (error) {
     console.error(error);
     return "";
