@@ -85,7 +85,6 @@ pub fn markdown_to_ast(input: &str, config: &JsValue) -> Result<String, JsError>
             indent: config.indent,
         },
     };
-    let context = MarkdownParserContext::default();
     let (_, p) = parser::markdown::page(Span::new_extra(input, context))?;
     Ok(format!("{:#?}", &p))
 }
