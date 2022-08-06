@@ -277,17 +277,17 @@ fn helpfeel() {}
 /// "\tabc"
 /// " \tabc"
 /// "  abc"
+/// "　abc"
 /// "\t1. abc"
-///
 fn list_item(input: Span) -> IResult<ListItem> {
-    let (input, tabs) = many1(alt((char('\t'), char(' '))))(input)?;
+    let (input, tabs) = many1(alt((char('\t'), char(' '), char('　'))))(input)?;
     let (input, decimal) = opt(terminated(digit1, tag(". ")))(input)?;
     let kind = match &decimal {
         Some(_) => ListKind::Decimal,
         None => ListKind::Disc,
     };
     let (input, children) = many0(node)(input)?;
-    let (input, _) = char('\n')(input)?;
+    let (input, _) = alt((tag("\n"), eof))(input)?;
     Ok((input, ListItem::new(kind, tabs.len(), children)))
 }
 
@@ -302,6 +302,8 @@ mod test {
         case(" \t123abc\n", ("", List::new(vec![ListItem::new(ListKind::Disc, 2, vec![Node::new(NodeKind::Text(Text::new("123abc")))])]))),
         case("\t 123abc\n", ("", List::new(vec![ListItem::new(ListKind::Disc, 2, vec![Node::new(NodeKind::Text(Text::new("123abc")))])]))),
         case("  123abc\n", ("", List::new(vec![ListItem::new(ListKind::Disc, 2, vec![Node::new(NodeKind::Text(Text::new("123abc")))])]))),
+        case("  123abc", ("", List::new(vec![ListItem::new(ListKind::Disc, 2, vec![Node::new(NodeKind::Text(Text::new("123abc")))])]))),
+        case("　　123abc", ("", List::new(vec![ListItem::new(ListKind::Disc, 2, vec![Node::new(NodeKind::Text(Text::new("123abc")))])]))),
         case("\t123. abc\n", ("", List::new(vec![ListItem::new(ListKind::Decimal, 1, vec![Node::new(NodeKind::Text(Text::new("abc")))])]))),
     )]
     fn list_valid_test(input: &str, expected: (&str, List)) {
