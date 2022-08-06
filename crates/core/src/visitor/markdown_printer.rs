@@ -1,27 +1,63 @@
 use super::{walk_paragraph, TransformCommand, Visitor};
 use crate::ast::*;
 
-pub struct ScrapboxPrinterConfig {
-    indent: String,
-    h1_mapping: usize,
+pub struct MarkdownPass {
+    // Examples:
+    // - `h1_level1` == 3: [*** text] -> `# text`
+    // - `h1_level1` == 3: [** text] -> `## text`
+    // - `h1_level1` == 3: [* text] -> `### text` or `**text**` (see `bold_to_h`)
+    // - `h1_level1` == 5: [***** text] -> `# text`
+    pub h1_level: usize,
+    // If true, `[* bold]` -> `**bold**`.
+    // If false, `[* bold]` -> `### bold`.
+    pub bold_to_h: bool,
 }
 
-impl Default for ScrapboxPrinterConfig {
+impl Default for MarkdownPass {
     fn default() -> Self {
         Self {
-            indent: "\t".into(),
-            h1_mapping: 4,
+            h1_level: 3,
+            bold_to_h: false,
         }
     }
 }
 
-pub struct ScrapboxPrinter {
-    document: String,
-    config: ScrapboxPrinterConfig,
+impl Visitor for MarkdownPass {
+    fn visit_emphasis(&mut self, emphasis: &Emphasis) -> Option<TransformCommand> {
+        let h_level = (self.h1_level + 1).saturating_sub(emphasis.bold);
+        if 0 < h_level
+            && h_level <= self.h1_level
+            && (self.bold_to_h || (!self.bold_to_h && emphasis.bold > 1))
+        {
+            Some(TransformCommand::Replace(NodeKind::Heading(Heading::new(
+                &emphasis.text,
+                h_level,
+            ))))
+        } else {
+            None
+        }
+    }
 }
 
-impl ScrapboxPrinter {
-    pub fn new(config: ScrapboxPrinterConfig) -> Self {
+pub struct MarkdownPrinterConfig {
+    pub indent: String,
+}
+
+impl Default for MarkdownPrinterConfig {
+    fn default() -> Self {
+        Self {
+            indent: "  ".into(),
+        }
+    }
+}
+
+pub struct MarkdownPrinter {
+    document: String,
+    config: MarkdownPrinterConfig,
+}
+
+impl MarkdownPrinter {
+    pub fn new(config: MarkdownPrinterConfig) -> Self {
         Self {
             document: String::new(),
             config,
@@ -34,7 +70,7 @@ impl ScrapboxPrinter {
     }
 }
 
-impl Visitor for ScrapboxPrinter {
+impl Visitor for MarkdownPrinter {
     fn visit_paragraph(&mut self, value: &mut Paragraph) -> Option<TransformCommand> {
         walk_paragraph(self, value);
         self.document.push_str("\n");
@@ -42,21 +78,13 @@ impl Visitor for ScrapboxPrinter {
     }
 
     fn visit_list(&mut self, value: &mut List) -> Option<TransformCommand> {
-        let mut number = 1;
         for item in value.children.iter_mut() {
-            let indent = self.config.indent.repeat(item.level + 1); // TODO(tkat0): consistency
+            let indent = self.config.indent.repeat(item.level - 1);
             match &item.kind {
-                ListKind::Disc => self.document.push_str(&format!("{}", indent)),
-                ListKind::Decimal => self.document.push_str(&format!("{}{}. ", indent, number)),
+                ListKind::Disc => self.document.push_str(&format!("{}* ", indent)),
+                ListKind::Decimal => self.document.push_str(&format!("{}1. ", indent)),
                 _ => {}
             }
-
-            if item.kind == ListKind::Decimal {
-                number += 1;
-            } else {
-                number = 1; // reset
-            }
-
             for node in item.children.iter_mut() {
                 self.visit_node(node);
             }
@@ -71,43 +99,41 @@ impl Visitor for ScrapboxPrinter {
     }
 
     fn visit_internal_link(&mut self, value: &InternalLink) -> Option<TransformCommand> {
-        self.document.push_str(&format!("[{}]", value.title));
+        self.document.push_str(&format!("[[{}]]", value.title));
         None
     }
 
     fn visit_external_link(&mut self, value: &ExternalLink) -> Option<TransformCommand> {
         if let Some(title) = &value.title {
             self.document
-                .push_str(&format!("[{} {}]", title, value.url));
+                .push_str(&format!("[{}]({})", title, value.url));
         } else {
-            self.document.push_str(&format!("[{}]", value.url));
+            self.document.push_str(&format!("{}", value.url));
         }
         None
     }
 
     fn visit_emphasis(&mut self, value: &Emphasis) -> Option<TransformCommand> {
-        self.document.push_str("[");
+        let mut tmp = value.text.clone();
         if value.bold > 0 {
-            self.document.push_str("*");
+            tmp = format!("**{}**", tmp);
         }
         if value.italic > 0 {
-            self.document.push_str("/");
+            tmp = format!("*{}*", tmp);
         }
         if value.strikethrough > 0 {
-            self.document.push_str("-");
+            tmp = format!("~~{}~~", tmp);
         }
-        self.document.push_str(&format!(" {}]", value.text));
+        self.document.push_str(&tmp);
         None
     }
 
     fn visit_heading(&mut self, value: &Heading) -> Option<TransformCommand> {
-        let level = if self.config.h1_mapping + 1 > value.level {
-            self.config.h1_mapping - value.level + 1
-        } else {
-            1
-        };
-        self.document
-            .push_str(&format!("[{} {}]\n", "*".repeat(level), value.text));
+        self.document.push_str(&format!(
+            "{} {}\n",
+            "#".repeat(value.level as usize),
+            value.text
+        ));
         None
     }
 
@@ -117,11 +143,11 @@ impl Visitor for ScrapboxPrinter {
     }
 
     fn visit_code_block(&mut self, value: &CodeBlock) -> Option<TransformCommand> {
-        self.document
-            .push_str(&format!("code:{}\n", value.file_name));
+        self.document.push_str(&format!("```{}\n", value.file_name));
         for code in &value.children {
-            self.document.push_str(&format!(" {}\n", code));
+            self.document.push_str(&format!("{}\n", code));
         }
+        self.document.push_str("```\n");
         None
     }
 
@@ -130,25 +156,34 @@ impl Visitor for ScrapboxPrinter {
             return None;
         }
 
-        self.document.push_str(&format!("table:{}\n", value.name));
         self.document
-            .push_str(&format!(" {}\n", value.header.join("\t")));
+            .push_str(&format!("| {} |", value.header.join(" | ")));
+        self.document.push_str("\n");
+
+        let sep = vec!["---"];
+        self.document.push_str(&format!(
+            "| {} |",
+            sep.repeat(value.header.len()).join(" | ")
+        ));
+
+        self.document.push_str("\n");
         for row in &value.rows {
             if row.is_empty() {
                 break;
             }
-            self.document.push_str(&format!(" {}\n", row.join("\t")));
+            self.document.push_str(&format!("| {} |", row.join(" | ")));
+            self.document.push_str("\n");
         }
         None
     }
 
     fn visit_image(&mut self, value: &Image) -> Option<TransformCommand> {
-        self.document.push_str(&format!("[{}]", value.uri));
+        self.document.push_str(&format!("![]({})", value.uri));
         None
     }
 
     fn visit_math(&mut self, value: &Math) -> Option<TransformCommand> {
-        self.document.push_str(&format!("[${}]", value.value));
+        self.document.push_str(&format!("$${}$$", value.value));
         None
     }
 
@@ -163,49 +198,46 @@ mod test {
     use super::*;
     use indoc::indoc;
 
-    // #[test]
-    // fn pass_test() {
-    //     let mut pass = ScrapboxPass::default();
+    #[test]
+    fn pass_test() {
+        let mut pass = MarkdownPass::default();
 
-    //     assert_eq!(
-    //         pass.visit_emphasis(&mut Emphasis::bold_level("text", 3)),
-    //         Some(TransformCommand::Replace(NodeKind::Heading(Heading::new(
-    //             "text", 1
-    //         ))))
-    //     );
-    // }
+        assert_eq!(
+            pass.visit_emphasis(&mut Emphasis::bold_level("text", 3)),
+            Some(TransformCommand::Replace(NodeKind::Heading(Heading::new(
+                "text", 1
+            ))))
+        );
+    }
 
-    // #[test]
-    // fn pass_bold_to_h_test() {
-    //     let mut pass = ScrapboxPass {
-    //         h1_level: 3,
-    //         bold_to_h: true,
-    //     };
+    #[test]
+    fn pass_bold_to_h_test() {
+        let mut pass = MarkdownPass {
+            h1_level: 3,
+            bold_to_h: true,
+        };
 
-    //     // TODO(tkat0): not supoprted: `[*-/ mix]` -> `### *~~mix~~*` (but `### mix`)
-    //     assert_eq!(
-    //         pass.visit_emphasis(&mut Emphasis::bold_level("text", 1)),
-    //         Some(TransformCommand::Replace(NodeKind::Heading(Heading::new(
-    //             "text", 3
-    //         ))))
-    //     )
-    // }
+        // TODO(tkat0): not supoprted: `[*-/ mix]` -> `### *~~mix~~*` (but `### mix`)
+        assert_eq!(
+            pass.visit_emphasis(&mut Emphasis::bold_level("text", 1)),
+            Some(TransformCommand::Replace(NodeKind::Heading(Heading::new(
+                "text", 3
+            ))))
+        )
+    }
 
     #[test]
     fn codegen_test() {
-        let mut visitor = ScrapboxPrinter::new(ScrapboxPrinterConfig::default());
+        let mut visitor = MarkdownPrinter::new(MarkdownPrinterConfig::default());
 
+        // TODO(tkat0): move this example to ast.rs and reuse for each printer test.
         let mut page = Page {
             nodes: vec![
                 Node::new(NodeKind::Paragraph(Paragraph::new(vec![
                     Node::new(NodeKind::Heading(Heading::new("heading", 1))),
-                    Node::new(NodeKind::Text(Text {
-                        value: "abc ".into(),
-                    })),
-                    Node::new(NodeKind::HashTag(HashTag {
-                        value: "tag".into(),
-                    })),
-                    Node::new(NodeKind::Text(Text { value: " ".into() })),
+                    Node::new(NodeKind::Text(Text::new("abc "))),
+                    Node::new(NodeKind::HashTag(HashTag::new("tag"))),
+                    Node::new(NodeKind::Text(Text::new(" "))),
                     Node::new(NodeKind::ExternalLink(ExternalLink::new(
                         Some("Rust"),
                         "https://www.rust-lang.org/",
@@ -252,29 +284,30 @@ mod test {
             ],
         };
 
-        let scrapbox = visitor.generate(&mut page);
+        let markdown = visitor.generate(&mut page);
 
-        let expected = indoc! {"
-            [**** heading]
-            abc #tag [Rust https://www.rust-lang.org/]
-            \t\t\tabc
-            code:hello.rs
-             fn main() {
-                 println(\"Hello, World!\");
-             }
+        let expected = indoc! {r#"
+            # heading
+            abc #tag [Rust](https://www.rust-lang.org/)
+              * abc
+            ```hello.rs
+            fn main() {
+                println("Hello, World!");
+            }
+            ```
 
-            [https://www.rust-lang.org/static/images/rust-logo-blk.svg]
-            table:table
-             a\tb\tc
-             d\te\tf
+            ![](https://www.rust-lang.org/static/images/rust-logo-blk.svg)
+            | a | b | c |
+            | --- | --- | --- |
+            | d | e | f |
 
-            table:table
-             a\tb\tc
+            | a | b | c |
+            | --- | --- | --- |
 
 
-            [$\\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}]
-        "};
+            $$\frac{-b \pm \sqrt{b^2-4ac}}{2a}$$
+        "#};
 
-        assert_eq!(scrapbox, expected)
+        assert_eq!(markdown, expected)
     }
 }

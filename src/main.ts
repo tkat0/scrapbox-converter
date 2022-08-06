@@ -6,7 +6,7 @@ import initCore, {
   markdownToScrapbox as markdownToScrapboxCore,
   markdownToAST as markdownToASTCore,
   Config,
-} from "@@/scrapbox_converter_core";
+} from "@@/scrapbox_converter_demo";
 
 export const init = async () => {
   await initCore();

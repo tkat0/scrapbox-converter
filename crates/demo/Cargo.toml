@@ -1,0 +1,16 @@
+[package]
+name = "scrapbox-converter-demo"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+scrapbox-converter-core = { path = "../core" }
+serde = { version = "1.0", features = ["derive"] }
+wasm-bindgen = { version = "0.2.81", features = ["serde-serialize"] }
+log = "0.4.6"
+wasm-logger = "0.2.0"
+
+[lib]
+crate-type = ["cdylib"]

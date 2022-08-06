@@ -2,15 +2,10 @@
   "name": "scrapbox-converter",
   "private": true,
   "version": "0.1.0",
-  "files": [
-    "pkg/scrapbox_converter_core_bg.wasm",
-    "pkg/scrapbox_converter_core.js",
-    "pkg/scrapbox_converter_core.d.ts"
-  ],
   "scripts": {
     "dev": "vite",
     "build": "npm run build:core && tsc && vite build",
-    "build:core": "wasm-pack build --target web -d pkg",
+    "build:core": "cd ./crates/demo && wasm-pack build --target web -d ../../pkg",
     "preview": "vite preview",
     "test": "vitest",
     "prepare": "husky install"
