@@ -238,8 +238,10 @@ mod test {
         // TODO(tkat0): move this example to ast.rs and reuse for each printer test.
         let mut page = Page {
             nodes: vec![
+                Node::new(NodeKind::Paragraph(Paragraph::new(vec![Node::new(
+                    NodeKind::Heading(Heading::new("heading", 1)),
+                )]))),
                 Node::new(NodeKind::Paragraph(Paragraph::new(vec![
-                    Node::new(NodeKind::Heading(Heading::new("heading", 1))),
                     Node::new(NodeKind::Text(Text::new("abc "))),
                     Node::new(NodeKind::HashTag(HashTag::new("tag"))),
                     Node::new(NodeKind::Text(Text::new(" "))),
