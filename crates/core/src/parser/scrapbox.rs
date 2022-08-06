@@ -2,7 +2,7 @@ use nom::{
     branch::alt,
     bytes::complete::{tag, take_until, take_while},
     character::complete::{char, digit1},
-    combinator::{map, opt},
+    combinator::{eof, map, opt},
     multi::{many0, many1},
     sequence::delimited,
     sequence::terminated,
@@ -20,15 +20,15 @@ pub fn page(input: Span) -> IResult<Page> {
         map(table, |s| Node::new(NodeKind::Table(s))),
         map(list, |s| Node::new(NodeKind::List(s))),
         map(paragraph, |s| Node::new(NodeKind::Paragraph(s))),
-        // workaround for no-newline like "hoge"
-        // map(text, |s| Node::new(NodeKind::Text(s))),
-        node,
     )))(input)?;
     Ok((input, Page { nodes }))
 }
 
 fn paragraph(input: Span) -> IResult<Paragraph> {
-    map(terminated(many0(node), char('\n')), |children| {
+    if input.is_empty() {
+        return Err(Err::Error(ParseError::new(input, "".into())));
+    }
+    map(terminated(many0(node), alt((tag("\n"), eof))), |children| {
         Paragraph::new(children)
     })(input)
 }
@@ -197,7 +197,11 @@ fn code_block(input: Span) -> IResult<CodeBlock> {
     let (input, file_name) = take_until("\n")(input)?;
     let (input, _) = char('\n')(input)?;
     map(
-        many0(delimited(char(' '), take_while(|c| c != '\n'), char('\n'))),
+        many0(delimited(
+            char(' '),
+            take_while(|c| c != '\n'),
+            alt((tag("\n"), eof)),
+        )),
         move |codes: Vec<Span>| {
             CodeBlock::new(
                 *file_name,
@@ -215,7 +219,9 @@ fn table(input: Span) -> IResult<Table> {
     let (input, _) = char('\n')(input)?;
 
     fn row(input: Span) -> IResult<Vec<String>> {
-        let (input, text) = delimited(char(' '), take_while(|c| c != '\n'), char('\n'))(input)?;
+        let (input, _) = tag(" ")(input)?;
+        let (input, text) = take_until_eol(input)?;
+        let (input, _) = opt(tag("\n"))(input)?;
 
         fn take_until_t(input: Span) -> IResult<String> {
             let (input, value) = take_until("\t")(input)?;
@@ -323,6 +329,7 @@ mod test {
     #[rstest(input, expected,
         case("table:table\n", ("", Table::new("table", vec![], vec![]))),
         case("table:table\n a\tb\tc\n d\te\tf\n", ("", Table::new("table", vec!["a".into(), "b".into(), "c".into()], vec![vec!["d".into(), "e".into(), "f".into()]]))),
+        case("table:table\n a\tb\tc\n d\te\tf", ("", Table::new("table", vec!["a".into(), "b".into(), "c".into()], vec![vec!["d".into(), "e".into(), "f".into()]]))),
         // case("table:table\n a\tb\tc\n", ("", Table::new("table", vec!["a".into(), "b".into(), "c".into()], vec![vec![]]))),
     )]
     fn table_valid_test(input: &str, expected: (&str, Table)) {
@@ -445,6 +452,7 @@ mod test {
     }
 
     #[rstest(input, expected,
+        case("abcde", ("", Paragraph::new( vec![Node::new(NodeKind::Text(Text::new("abcde")))]))),
         case(" \n", ("", Paragraph::new( vec![Node::new(NodeKind::Text(Text::new(" ")))]))),
         case("#tag #tag [internal link]\n", ("", Paragraph::new(
             vec![
@@ -461,13 +469,6 @@ mod test {
             paragraph(Span::new(input)).map(|(input, ret)| (*input, ret)),
             Ok(expected)
         );
-    }
-
-    #[rstest(input, case(" "), case(""))]
-    fn paragraph_invalid_test(input: &str) {
-        if let Ok(ok) = paragraph(Span::new(input)) {
-            panic!("{:?}", ok)
-        }
     }
 
     #[rstest(input, expected,
