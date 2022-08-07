@@ -1,0 +1,29 @@
+コードブロック
+`code:言語名`もしくは`code:ファイル名`から1段字下げしたブロックがシンタックスハイライトされます
+
+言語名は省略形でも可
+```alert.js
+ (function () {
+   alert(document.location.href)
+   console.log("hello")
+   // コメントも書けるぞ 😳
+ })()
+```
+ファイル名の場合は拡張子で言語が判定されます
+```app.rb
+ get '/' do |req, res|
+   res.send 'hello!!'
+ end
+```
+ファイル名があるコードブロックは、テキストデータとして取得できます
+* ↓のファイル名の部分がリンクになっています
+```app.rb
+ post '/message' do |req, res|
+   res.send "received message #{res.params}"
+ end
+ページ内に同名のコードブロックが複数ある場合、1つのファイルとして連結されます
+```
+
+コードにはURLが発行されます
+* https://scrapbox.io/api/code/help-jp/コードブロック記法/app.rb
+* `https://scrapbox.io/api/code/:projectName/:pageTitle)/:codeName`

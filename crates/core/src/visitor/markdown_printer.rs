@@ -37,6 +37,35 @@ impl Visitor for MarkdownPass {
             None
         }
     }
+
+    fn visit_list(&mut self, value: &mut List) -> Option<TransformCommand> {
+        let mut new_nodes: Vec<Node> = vec![];
+        let mut last_is_code_block = true;
+        for item in value.children.iter() {
+            if let Some(NodeKind::CodeBlock(code_block)) = &item.children.get(0).map(|c| &c.kind) {
+                new_nodes.push(Node::new(NodeKind::CodeBlock(code_block.clone())));
+                last_is_code_block = true;
+            } else {
+                if last_is_code_block {
+                    new_nodes.push(Node::new(NodeKind::List(List::new(vec![item.clone()]))));
+                } else {
+                    if let NodeKind::List(list) = &mut new_nodes.last_mut().unwrap().kind {
+                        list.children.push(item.clone());
+                    }
+                }
+                last_is_code_block = false;
+            }
+        }
+
+        if new_nodes.len() == 1 {
+            Some(TransformCommand::Replace(new_nodes[0].kind.clone()))
+        } else {
+            // TODO: [refactor] create a kind of Group instead of Paragraph
+            Some(TransformCommand::Replace(NodeKind::Paragraph(
+                Paragraph::new(new_nodes),
+            )))
+        }
+    }
 }
 
 pub struct MarkdownPrinterConfig {
@@ -228,6 +257,27 @@ mod test {
             Some(TransformCommand::Replace(NodeKind::Heading(Heading::new(
                 "text", 3
             ))))
+        )
+    }
+
+    #[test]
+    fn pass_flatten_code_block_in_list() {
+        let mut pass = MarkdownPass::default();
+
+        let code_block = Node::new(NodeKind::CodeBlock(CodeBlock::new(
+            "hello.rs",
+            vec!["fn main() {", r#"    println("Hello, World!");"#, "}"],
+        )));
+
+        let mut input = List::new(vec![ListItem::new(
+            ListKind::Disc,
+            1,
+            vec![code_block.clone()],
+        )]);
+
+        assert_eq!(
+            pass.visit_list(&mut input),
+            Some(TransformCommand::Replace(code_block.kind))
         )
     }
 

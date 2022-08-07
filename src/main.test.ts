@@ -10,15 +10,18 @@ describe(`scrapboxToMarkdown`, () => {
     await init();
   });
 
-  test(`Scrapboxの使い方`, () => {
-    const input = fs.readFileSync(
-      "./src/__test__/help-jp/Scrapboxの使い方_input.txt",
-      "utf8"
-    );
-    const expected = fs.readFileSync(
-      "./src/__test__/help-jp/Scrapboxの使い方_expected.txt",
-      "utf8"
-    );
-    expect(scrapboxToMarkdown(input, defaultConfig)).toEqual(expected);
-  });
+  const genTest = (path: string) => {
+    test(path, () => {
+      const input = fs.readFileSync(`./src/__test__${path}_input.txt`, "utf8");
+      const expected = fs.readFileSync(
+        `./src/__test__${path}_expected.txt`,
+        "utf8"
+      );
+      expect(scrapboxToMarkdown(input, defaultConfig)).toEqual(expected);
+    });
+  };
+
+  // https://scrapbox.io/help-jp/
+  genTest(`/help-jp/Scrapboxの使い方`);
+  genTest(`/help-jp/コードブロック`);
 });

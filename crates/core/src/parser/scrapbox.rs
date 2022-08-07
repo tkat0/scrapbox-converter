@@ -16,8 +16,6 @@ use crate::ast::*;
 pub fn page(input: Span) -> IResult<Page> {
     let (input, nodes) = many0(alt((
         // parser for multiline block
-        map(code_block, |s| Node::new(NodeKind::CodeBlock(s))),
-        map(table, |s| Node::new(NodeKind::Table(s))),
         map(list, |s| Node::new(NodeKind::List(s))),
         map(paragraph, |s| Node::new(NodeKind::Paragraph(s))),
     )))(input)?;
@@ -39,6 +37,8 @@ fn list(input: Span) -> IResult<List> {
 
 fn node(input: Span) -> IResult<Node> {
     alt((
+        map(code_block, |s| Node::new(NodeKind::CodeBlock(s))),
+        map(table, |s| Node::new(NodeKind::Table(s))),
         // parser for single line
         map(hashtag, |s| Node::new(NodeKind::HashTag(s))),
         map(block_quate, |s| Node::new(NodeKind::BlockQuate(s))),
@@ -196,24 +196,25 @@ fn math(input: Span) -> IResult<Math> {
 }
 
 /// code:filename.extension
-/// TODO(tkat0): List + CodeBlock is not supported yet.
 fn code_block(input: Span) -> IResult<CodeBlock> {
+    // TODO: use Span::extra to get indent in the list.
+    let (input, indent) = many0(alt((char(' '), char(' '), char('　'))))(input)?;
+    let prefix = format!(" {}", " ".repeat(indent.len()));
     let (input, _) = tag("code:")(input)?;
     let (input, file_name) = take_until("\n")(input)?;
     let (input, _) = char('\n')(input)?;
-    map(
-        many0(delimited(
-            char(' '),
-            take_while(|c| c != '\n'),
-            alt((tag("\n"), eof)),
-        )),
-        move |codes: Vec<Span>| {
-            CodeBlock::new(
-                *file_name,
-                codes.iter().map(|span| *span.fragment()).collect(),
-            )
-        },
-    )(input)
+    let (input, codes) = many0(delimited(
+        tag(prefix.as_str()),
+        take_while(|c| c != '\n'),
+        alt((tag("\n"), eof)),
+    ))(input)?;
+    Ok((
+        input,
+        CodeBlock::new(
+            *file_name,
+            codes.iter().map(|span| *span.fragment()).collect(),
+        ),
+    ))
 }
 
 /// table:name\n
@@ -325,6 +326,7 @@ mod test {
 
     #[rstest(input, expected,
         case("code:hello.rs\n     panic!()\n     panic!()\n", ("", CodeBlock::new("hello.rs", vec!["    panic!()", "    panic!()"]))),
+        case(" code:hello.rs\n      panic!()\n      panic!()\n abc\n", (" abc\n", CodeBlock::new("hello.rs", vec!["    panic!()", "    panic!()"]))),
     )]
     fn code_block_valid_test(input: &str, expected: (&str, CodeBlock)) {
         assert_eq!(

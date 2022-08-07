@@ -34,43 +34,43 @@ pub trait Visitor: Sized {
         None
     }
 
-    fn visit_hashtag(&mut self, _value: &HashTag) -> Option<TransformCommand> {
+    fn visit_hashtag(&mut self, value: &HashTag) -> Option<TransformCommand> {
         None
     }
 
-    fn visit_internal_link(&mut self, _value: &InternalLink) -> Option<TransformCommand> {
+    fn visit_internal_link(&mut self, value: &InternalLink) -> Option<TransformCommand> {
         None
     }
 
-    fn visit_external_link(&mut self, _value: &ExternalLink) -> Option<TransformCommand> {
+    fn visit_external_link(&mut self, value: &ExternalLink) -> Option<TransformCommand> {
         None
     }
 
-    fn visit_emphasis(&mut self, _value: &Emphasis) -> Option<TransformCommand> {
+    fn visit_emphasis(&mut self, value: &Emphasis) -> Option<TransformCommand> {
         None
     }
 
-    fn visit_heading(&mut self, _value: &Heading) -> Option<TransformCommand> {
+    fn visit_heading(&mut self, value: &Heading) -> Option<TransformCommand> {
         None
     }
 
-    fn visit_block_quate(&mut self, _value: &BlockQuate) -> Option<TransformCommand> {
+    fn visit_block_quate(&mut self, value: &BlockQuate) -> Option<TransformCommand> {
         None
     }
 
-    fn visit_code_block(&mut self, _value: &CodeBlock) -> Option<TransformCommand> {
+    fn visit_code_block(&mut self, value: &CodeBlock) -> Option<TransformCommand> {
         None
     }
 
-    fn visit_table(&mut self, _value: &Table) -> Option<TransformCommand> {
+    fn visit_table(&mut self, value: &Table) -> Option<TransformCommand> {
         None
     }
 
-    fn visit_image(&mut self, _value: &Image) -> Option<TransformCommand> {
+    fn visit_image(&mut self, value: &Image) -> Option<TransformCommand> {
         None
     }
 
-    fn visit_math(&mut self, _value: &Math) -> Option<TransformCommand> {
+    fn visit_math(&mut self, value: &Math) -> Option<TransformCommand> {
         None
     }
 
