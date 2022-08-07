@@ -39,12 +39,25 @@ impl Visitor for MarkdownPass {
     }
 
     fn visit_list(&mut self, value: &mut List) -> Option<TransformCommand> {
+        // NOTE: table or code blcok in a list is not supported. It is flattened.
         let mut new_nodes: Vec<Node> = vec![];
-        let mut last_is_code_block = true;
+        let mut prev_is_flattened = true;
         for item in value.children.iter() {
             if let Some(NodeKind::CodeBlock(code_block)) = &item.children.get(0).map(|c| &c.kind) {
                 new_nodes.push(Node::new(NodeKind::CodeBlock(code_block.clone())));
-                last_is_code_block = true;
+                prev_is_flattened = true;
+
+                if item.children.len() > 1 {
+                    let children: Vec<Node> = item.children.clone().into_iter().skip(1).collect();
+                    new_nodes.push(Node::new(NodeKind::List(List::new(vec![ListItem::new(
+                        item.kind.clone(),
+                        item.level,
+                        children,
+                    )]))))
+                }
+            } else if let Some(NodeKind::Table(table)) = &item.children.get(0).map(|c| &c.kind) {
+                new_nodes.push(Node::new(NodeKind::Table(table.clone())));
+                prev_is_flattened = true;
 
                 if item.children.len() > 1 {
                     let children: Vec<Node> = item.children.clone().into_iter().skip(1).collect();
@@ -55,14 +68,14 @@ impl Visitor for MarkdownPass {
                     )]))))
                 }
             } else {
-                if last_is_code_block {
+                if prev_is_flattened {
                     new_nodes.push(Node::new(NodeKind::List(List::new(vec![item.clone()]))));
                 } else {
                     if let NodeKind::List(list) = &mut new_nodes.last_mut().unwrap().kind {
                         list.children.push(item.clone());
                     }
                 }
-                last_is_code_block = false;
+                prev_is_flattened = false;
             }
         }
 

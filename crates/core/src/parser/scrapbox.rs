@@ -206,7 +206,6 @@ fn math(input: Span) -> IResult<Math> {
 
 /// code:filename.extension
 fn code_block(input: Span) -> IResult<CodeBlock> {
-    // TODO: use Span::extra to get indent in the list.
     let prefix = format!(" {}", " ".repeat(input.extra.indent));
     let (input, _) = tag("code:")(input)?;
     let (input, file_name) = take_until("\n")(input)?;
@@ -233,7 +232,8 @@ fn table(input: Span) -> IResult<Table> {
     let (input, _) = char('\n')(input)?;
 
     fn row(input: Span) -> IResult<Vec<String>> {
-        let (input, _) = tag(" ")(input)?;
+        let prefix = format!(" {}", " ".repeat(input.extra.indent));
+        let (input, _) = tag(prefix.as_str())(input)?;
         let (input, text) = take_until_eol(input)?;
         let (input, _) = opt(tag("\n"))(input)?;
 
@@ -370,6 +370,17 @@ mod test {
     fn table_valid_test(input: &str, expected: (&str, Table)) {
         assert_eq!(
             table(Span::new_extra(input, ScrapboxParserContext::default()))
+                .map(|(input, ret)| (*input, ret)),
+            Ok(expected)
+        );
+    }
+
+    #[rstest(input, expected,
+        case("table:table\n  a\tb\tc\n  d\te\tf\n a\tb\tc\n", (" a\tb\tc\n", Table::new("table", vec!["a".into(), "b".into(), "c".into()], vec![vec!["d".into(), "e".into(), "f".into()]]))),
+    )]
+    fn table_in_list_valid_test(input: &str, expected: (&str, Table)) {
+        assert_eq!(
+            table(Span::new_extra(input, ScrapboxParserContext { indent: 1 }))
                 .map(|(input, ret)| (*input, ret)),
             Ok(expected)
         );
