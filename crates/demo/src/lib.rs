@@ -2,7 +2,8 @@ use scrapbox_converter_core::{
     parser::{
         markdown,
         markdown::{MarkdownParserConfig, MarkdownParserContext},
-        scrapbox, Span,
+        scrapbox::{self, ScrapboxParserContext},
+        Span,
     },
     visitor::{
         markdown_printer::{MarkdownPass, MarkdownPrinter, MarkdownPrinterConfig},
@@ -36,7 +37,7 @@ export function markdownToAST(input: string, config: Config): string;
 #[wasm_bindgen(js_name = scrapboxToMarkdown, skip_typescript)]
 pub fn scrapbox_to_markdown(input: &str, config: &JsValue) -> Result<String, JsError> {
     let config: Config = config.into_serde()?;
-    let (_, mut p) = scrapbox::page(Span::new(input))?;
+    let (_, mut p) = scrapbox::page(Span::new_extra(input, ScrapboxParserContext::default()))?;
     let mut pass = MarkdownPass {
         h1_level: config.heading1_mapping,
         bold_to_h: config.bold_to_heading,
@@ -48,8 +49,13 @@ pub fn scrapbox_to_markdown(input: &str, config: &JsValue) -> Result<String, JsE
 
 #[wasm_bindgen(js_name = scrapboxToAST, skip_typescript)]
 pub fn scrapbox_to_ast(input: &str, config: &JsValue) -> Result<String, JsError> {
-    let _config: Config = config.into_serde()?;
-    let (_, p) = scrapbox::page(Span::new(input))?;
+    let config: Config = config.into_serde()?;
+    let (_, mut p) = scrapbox::page(Span::new_extra(input, ScrapboxParserContext::default()))?;
+    let mut pass = MarkdownPass {
+        h1_level: config.heading1_mapping,
+        bold_to_h: config.bold_to_heading,
+    };
+    pass.visit(&mut p);
     Ok(format!("{:#?}", &p))
 }
 

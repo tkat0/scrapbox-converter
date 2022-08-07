@@ -63,6 +63,15 @@ impl List {
     pub fn new(children: Vec<ListItem>) -> Self {
         Self { children }
     }
+
+    pub fn split_at(&self, mid: usize) -> (Self, Self) {
+        let (a, b) = self.children.split_at(mid);
+
+        let a = Self::new(a.to_vec());
+        let b = Self::new(b.to_vec());
+
+        (a, b)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]

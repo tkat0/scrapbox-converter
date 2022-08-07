@@ -9,9 +9,18 @@ use nom::{
     Err, InputTake,
 };
 
-use super::error::*;
 use super::utils::*;
+use super::{error, ParseError};
 use crate::ast::*;
+
+pub type Span<'a> = error::Span<'a, ScrapboxParserContext>;
+pub type IResult<'a, O> = error::IResult<'a, O, ScrapboxParserContext>;
+
+#[derive(Default, Debug, Copy, Clone, PartialEq)]
+pub struct ScrapboxParserContext {
+    /// current indent size of list
+    pub indent: usize,
+}
 
 pub fn page(input: Span) -> IResult<Page> {
     let (input, nodes) = many0(alt((
@@ -90,7 +99,7 @@ fn external_link(input: Span) -> IResult<ExternalLink> {
         let (title, _) = space0(input)?;
         let title = if title.is_empty() { None } else { Some(title) };
         Ok((
-            Span::new(""),
+            Span::new_extra("", input.extra),
             ExternalLink::new(title.map(|s: Span| *s), &url),
         ))
     }
@@ -198,8 +207,7 @@ fn math(input: Span) -> IResult<Math> {
 /// code:filename.extension
 fn code_block(input: Span) -> IResult<CodeBlock> {
     // TODO: use Span::extra to get indent in the list.
-    let (input, indent) = many0(alt((char(' '), char(' '), char('　'))))(input)?;
-    let prefix = format!(" {}", " ".repeat(indent.len()));
+    let prefix = format!(" {}", " ".repeat(input.extra.indent));
     let (input, _) = tag("code:")(input)?;
     let (input, file_name) = take_until("\n")(input)?;
     let (input, _) = char('\n')(input)?;
@@ -282,12 +290,17 @@ fn helpfeel() {}
 /// "\t1. abc"
 fn list_item(input: Span) -> IResult<ListItem> {
     let (input, tabs) = many1(alt((char('\t'), char(' '), char('　'))))(input)?;
-    let (input, decimal) = opt(terminated(digit1, tag(". ")))(input)?;
+    let (mut input, decimal) = opt(terminated(digit1, tag(". ")))(input)?;
     let kind = match &decimal {
         Some(_) => ListKind::Decimal,
         None => ListKind::Disc,
     };
-    let (input, children) = many0(node)(input)?;
+
+    // update context to show "inside list"
+    input.extra.indent = tabs.len();
+    let (mut input, children) = many0(node)(input)?;
+    input.extra.indent = 0;
+
     let (input, _) = alt((tag("\n"), eof))(input)?;
     Ok((input, ListItem::new(kind, tabs.len(), children)))
 }
@@ -309,7 +322,8 @@ mod test {
     )]
     fn list_valid_test(input: &str, expected: (&str, List)) {
         assert_eq!(
-            list(Span::new(input)).map(|(input, ret)| (*input, ret)),
+            list(Span::new_extra(input, ScrapboxParserContext::default()))
+                .map(|(input, ret)| (*input, ret)),
             Ok(expected)
         );
     }
@@ -319,18 +333,30 @@ mod test {
     )]
     fn commandline_valid_test(input: &str, expected: (&str, BlockQuate)) {
         assert_eq!(
-            commandline(Span::new(input)).map(|(input, ret)| (*input, ret)),
+            commandline(Span::new_extra(input, ScrapboxParserContext::default()))
+                .map(|(input, ret)| (*input, ret)),
             Ok(expected)
         );
     }
 
     #[rstest(input, expected,
         case("code:hello.rs\n     panic!()\n     panic!()\n", ("", CodeBlock::new("hello.rs", vec!["    panic!()", "    panic!()"]))),
-        case(" code:hello.rs\n      panic!()\n      panic!()\n abc\n", (" abc\n", CodeBlock::new("hello.rs", vec!["    panic!()", "    panic!()"]))),
     )]
     fn code_block_valid_test(input: &str, expected: (&str, CodeBlock)) {
         assert_eq!(
-            code_block(Span::new(input)).map(|(input, ret)| (*input, ret)),
+            code_block(Span::new_extra(input, ScrapboxParserContext::default()))
+                .map(|(input, ret)| (*input, ret)),
+            Ok(expected)
+        );
+    }
+
+    #[rstest(input, expected,
+        case("code:hello.rs\n      panic!()\n      panic!()\n abc\n", (" abc\n", CodeBlock::new("hello.rs", vec!["    panic!()", "    panic!()"]))),
+    )]
+    fn code_block_in_list_valid_test(input: &str, expected: (&str, CodeBlock)) {
+        assert_eq!(
+            code_block(Span::new_extra(input, ScrapboxParserContext { indent: 1 }))
+                .map(|(input, ret)| (*input, ret)),
             Ok(expected)
         );
     }
@@ -343,7 +369,8 @@ mod test {
     )]
     fn table_valid_test(input: &str, expected: (&str, Table)) {
         assert_eq!(
-            table(Span::new(input)).map(|(input, ret)| (*input, ret)),
+            table(Span::new_extra(input, ScrapboxParserContext::default()))
+                .map(|(input, ret)| (*input, ret)),
             Ok(expected)
         );
     }
@@ -356,7 +383,8 @@ mod test {
     )]
     fn image_valid_test(input: &str, expected: (&str, Image)) {
         assert_eq!(
-            image(Span::new(input)).map(|(input, ret)| (*input, ret)),
+            image(Span::new_extra(input, ScrapboxParserContext::default()))
+                .map(|(input, ret)| (*input, ret)),
             Ok(expected)
         );
     }
@@ -370,7 +398,8 @@ mod test {
     )]
     fn emphasis_valid_test(input: &str, expected: (&str, Emphasis)) {
         assert_eq!(
-            emphasis(Span::new(input)).map(|(input, ret)| (*input, ret)),
+            emphasis(Span::new_extra(input, ScrapboxParserContext::default()))
+                .map(|(input, ret)| (*input, ret)),
             Ok(expected)
         );
     }
@@ -381,7 +410,8 @@ mod test {
     )]
     fn bold_valid_test(input: &str, expected: (&str, Emphasis)) {
         assert_eq!(
-            bold(Span::new(input)).map(|(input, ret)| (*input, ret)),
+            bold(Span::new_extra(input, ScrapboxParserContext::default()))
+                .map(|(input, ret)| (*input, ret)),
             Ok(expected)
         );
     }
@@ -392,7 +422,8 @@ mod test {
     )]
     fn internal_link_valid_test(input: &str, expected: (&str, InternalLink)) {
         assert_eq!(
-            internal_link(Span::new(input)).map(|(input, ret)| (*input, ret)),
+            internal_link(Span::new_extra(input, ScrapboxParserContext::default()))
+                .map(|(input, ret)| (*input, ret)),
             Ok(expected)
         );
     }
@@ -402,7 +433,8 @@ mod test {
     )]
     fn external_link_other_project_valid_test(input: &str, expected: (&str, ExternalLink)) {
         assert_eq!(
-            external_link_other_project(Span::new(input)).map(|(input, ret)| (*input, ret)),
+            external_link_other_project(Span::new_extra(input, ScrapboxParserContext::default()))
+                .map(|(input, ret)| (*input, ret)),
             Ok(expected)
         );
     }
@@ -425,7 +457,8 @@ mod test {
     )]
     fn external_link_valid_test(input: &str, expected: (&str, ExternalLink)) {
         assert_eq!(
-            external_link(Span::new(input)).map(|(input, ret)| (*input, ret)),
+            external_link(Span::new_extra(input, ScrapboxParserContext::default()))
+                .map(|(input, ret)| (*input, ret)),
             Ok(expected)
         );
     }
@@ -435,7 +468,8 @@ mod test {
     )]
     fn math_valid_test(input: &str, expected: (&str, Math)) {
         assert_eq!(
-            math(Span::new(input)).map(|(input, ret)| (*input, ret)),
+            math(Span::new_extra(input, ScrapboxParserContext::default()))
+                .map(|(input, ret)| (*input, ret)),
             Ok(expected)
         );
     }
@@ -448,14 +482,15 @@ mod test {
     )]
     fn node_valid_test(input: &str, expected: (&str, Node)) {
         assert_eq!(
-            node(Span::new(input)).map(|(input, ret)| (*input, ret)),
+            node(Span::new_extra(input, ScrapboxParserContext::default()))
+                .map(|(input, ret)| (*input, ret)),
             Ok(expected)
         );
     }
 
     #[rstest(input, case(""), case("\n"))]
     fn node_invalid_test(input: &str) {
-        if let Ok(ok) = text(Span::new(input)) {
+        if let Ok(ok) = text(Span::new_extra(input, ScrapboxParserContext::default())) {
             panic!("{:?}", ok)
         }
     }
@@ -475,7 +510,8 @@ mod test {
     )]
     fn paragraph_valid_test(input: &str, expected: (&str, Paragraph)) {
         assert_eq!(
-            paragraph(Span::new(input)).map(|(input, ret)| (*input, ret)),
+            paragraph(Span::new_extra(input, ScrapboxParserContext::default()))
+                .map(|(input, ret)| (*input, ret)),
             Ok(expected)
         );
     }
@@ -532,7 +568,8 @@ mod test {
     )]
     fn page_valid_test(input: &str, expected: (&str, Page)) {
         assert_eq!(
-            page(Span::new(input)).map(|(input, ret)| (*input, ret)),
+            page(Span::new_extra(input, ScrapboxParserContext::default()))
+                .map(|(input, ret)| (*input, ret)),
             Ok(expected)
         );
     }

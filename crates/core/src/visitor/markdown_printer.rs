@@ -45,6 +45,15 @@ impl Visitor for MarkdownPass {
             if let Some(NodeKind::CodeBlock(code_block)) = &item.children.get(0).map(|c| &c.kind) {
                 new_nodes.push(Node::new(NodeKind::CodeBlock(code_block.clone())));
                 last_is_code_block = true;
+
+                if item.children.len() > 1 {
+                    let children: Vec<Node> = item.children.clone().into_iter().skip(1).collect();
+                    new_nodes.push(Node::new(NodeKind::List(List::new(vec![ListItem::new(
+                        item.kind.clone(),
+                        item.level,
+                        children,
+                    )]))))
+                }
             } else {
                 if last_is_code_block {
                     new_nodes.push(Node::new(NodeKind::List(List::new(vec![item.clone()]))));
