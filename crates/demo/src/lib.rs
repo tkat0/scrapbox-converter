@@ -56,7 +56,10 @@ pub fn scrapbox_to_ast(input: &str, config: &JsValue) -> Result<String, JsError>
         bold_to_h: config.bold_to_heading,
     };
     pass.visit(&mut p);
-    Ok(format!("{:#?}", &p))
+
+    // TODO: configurable
+    // serde_json::to_string_pretty(&p).map_err(JsError::from)
+    serde_yaml::to_string(&p).map_err(JsError::from)
 }
 
 #[wasm_bindgen(js_name = markdownToScrapbox, skip_typescript)]

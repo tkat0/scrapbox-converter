@@ -4,8 +4,8 @@
   "version": "0.1.0",
   "scripts": {
     "dev": "vite",
-    "build": "npm run build:core && tsc && vite build",
-    "build:core": "cd ./crates/demo && wasm-pack build --target web -d ../../pkg",
+    "build": "npm run build:wasm && tsc && vite build",
+    "build:wasm": "cd ./crates/demo && wasm-pack build --target web -d ../../pkg",
     "preview": "vite preview",
     "test": "vitest",
     "prepare": "husky install"

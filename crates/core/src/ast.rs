@@ -1,22 +1,24 @@
-#[derive(Debug, Clone, PartialEq, Default)]
+use serde::Serialize;
+
+#[derive(Debug, Clone, PartialEq, Default, Serialize)]
 pub struct Page {
     pub nodes: Vec<Node>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Node {
     pub id: NodeId,
     pub kind: NodeKind,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Hash, Serialize)]
 pub struct NodeId(usize);
 
 /// When parsing the AST, NodeId is given this dummy Id.
 /// Then, during a later phase, it will be replaced.
 pub const DUMMY_NODE_ID: NodeId = NodeId(usize::MIN);
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum NodeKind {
     Paragraph(Paragraph),
     List(List),
@@ -43,7 +45,7 @@ impl Node {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Paragraph {
     pub children: Vec<Node>,
 }
@@ -54,7 +56,7 @@ impl Paragraph {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct List {
     pub children: Vec<ListItem>,
 }
@@ -74,14 +76,14 @@ impl List {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum ListKind {
     Disc,
     Decimal,
     Alphabet,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ListItem {
     pub kind: ListKind,
     pub level: usize,
@@ -122,7 +124,7 @@ impl ListItem {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Default, Serialize)]
 pub struct HashTag {
     pub value: String,
 }
@@ -135,7 +137,7 @@ impl HashTag {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct BlockQuate {
     pub value: String,
 }
@@ -148,7 +150,7 @@ impl BlockQuate {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct CodeBlock {
     pub file_name: String,
     pub children: Vec<String>,
@@ -163,7 +165,7 @@ impl CodeBlock {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Table {
     pub name: String,
     pub header: Vec<String>,
@@ -180,7 +182,7 @@ impl Table {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Default, Serialize)]
 pub struct Text {
     pub value: String,
 }
@@ -193,7 +195,7 @@ impl Text {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Default, Serialize)]
 pub struct InternalLink {
     pub title: String,
 }
@@ -206,7 +208,7 @@ impl InternalLink {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Default, Serialize)]
 pub struct ExternalLink {
     pub title: Option<String>,
     pub url: String,
@@ -221,7 +223,7 @@ impl ExternalLink {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Default, Serialize)]
 pub struct Heading {
     pub text: String,
     pub level: usize,
@@ -237,7 +239,7 @@ impl Heading {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Default, Serialize)]
 pub struct Emphasis {
     pub text: String,
     pub bold: usize,
@@ -288,7 +290,7 @@ impl Emphasis {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Default, Serialize)]
 pub struct Image {
     // TODO(tkat0): title
     pub uri: String,
@@ -300,7 +302,7 @@ impl Image {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Default, Serialize)]
 pub struct Math {
     pub value: String,
 }
@@ -313,7 +315,7 @@ impl Math {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Default, Serialize)]
 pub struct HtmlTag {
     /// "<tag>", "<tag />", "</tag>"
     pub value: String,

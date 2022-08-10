@@ -8,6 +8,8 @@ edition = "2021"
 [dependencies]
 scrapbox-converter-core = { path = "../core" }
 serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.9"
 wasm-bindgen = { version = "0.2.81", features = ["serde-serialize"] }
 log = "0.4.6"
 wasm-logger = "0.2.0"
