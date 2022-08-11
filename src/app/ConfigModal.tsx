@@ -71,16 +71,9 @@ export const ConfigModal: React.FC<ConfigModalProps> = (props) => {
             />
             <Divider />
 
-            <Heading size="md" marginTop={"8"}>
+            {/* <Heading size="md" marginTop={"8"}>
               Markdown to Scrapbox
-            </Heading>
-            <ConfigIndent
-              value={config.indent}
-              defaultValue={defaultConfig.indent}
-              setValue={(value) => {
-                setConfig({ ...config, indent: value });
-              }}
-            />
+            </Heading> */}
           </ModalBody>
           <ModalFooter>
             <Button onClick={onClose}>Close</Button>
@@ -144,55 +137,6 @@ function ConfigBold(props: ConfigProps<boolean>) {
           setValue(!value);
         }}
       />
-    </ConfigRow>
-  );
-}
-
-function ConfigIndent(props: ConfigProps<IndentKind>) {
-  const { value, setValue, defaultValue } = props;
-  const useTab = value.type == "Tab";
-  return (
-    <ConfigRow
-      title={"Indent of markdown list"}
-      descriptions={[`space or tab`]}
-      defaultValue={defaultValue}
-      setValue={setValue}
-    >
-      <Heading size="sm">use Tab</Heading>
-      <Switch
-        size="sm"
-        isChecked={useTab}
-        onChange={() => {
-          if (useTab) {
-            setValue({ type: "Space", size: 2 });
-          } else {
-            setValue({ type: "Tab" });
-          }
-        }}
-      />
-      {!useTab && (
-        <>
-          <Heading size="sm">size</Heading>
-          <NumberInput
-            defaultValue={value.size}
-            min={1}
-            max={8}
-            size="sm"
-            onChange={(value) => {
-              const v = parseInt(value);
-              if (1 <= v && v <= 8) {
-                setValue({ type: "Space", size: parseInt(value) });
-              }
-            }}
-          >
-            <NumberInputField size={1} />
-            <NumberInputStepper>
-              <NumberIncrementStepper />
-              <NumberDecrementStepper />
-            </NumberInputStepper>
-          </NumberInput>
-        </>
-      )}
     </ConfigRow>
   );
 }

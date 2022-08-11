@@ -66,9 +66,8 @@ pub fn scrapbox_to_ast(input: &str, config: &JsValue) -> Result<String, JsError>
 pub fn markdown_to_scrapbox(input: &str, config: &JsValue) -> Result<String, JsError> {
     let config: Config = config.into_serde()?;
     let context = MarkdownParserContext {
-        config: MarkdownParserConfig {
-            indent: config.indent,
-        },
+        config: MarkdownParserConfig {},
+        ..Default::default()
     };
     let (_, mut p) = markdown::page(Span::new_extra(input, context))?;
     let mut visitor = ScrapboxPrinter::new(ScrapboxPrinterConfig::default());
@@ -79,9 +78,8 @@ pub fn markdown_to_scrapbox(input: &str, config: &JsValue) -> Result<String, JsE
 pub fn markdown_to_ast(input: &str, config: &JsValue) -> Result<String, JsError> {
     let config: Config = config.into_serde()?;
     let context = MarkdownParserContext {
-        config: MarkdownParserConfig {
-            indent: config.indent,
-        },
+        config: MarkdownParserConfig {},
+        ..Default::default()
     };
     let (_, p) = markdown::page(Span::new_extra(input, context))?;
     Ok(format!("{:#?}", &p))

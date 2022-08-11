@@ -20,6 +20,7 @@ pub type IResult<'a, O> = error::IResult<'a, O, MarkdownParserContext>;
 #[derive(Default, Debug, Copy, Clone, PartialEq)]
 pub struct MarkdownParserContext {
     pub config: MarkdownParserConfig,
+    pub indent: Option<IndentKind>,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize)]
@@ -29,17 +30,21 @@ pub enum IndentKind {
     Space { size: usize },
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub struct MarkdownParserConfig {
-    /// indent size of markdown list
-    pub indent: IndentKind,
+impl IndentKind {
+    pub fn to_string(&self) -> String {
+        match self {
+            IndentKind::Space { size } => " ".repeat(*size),
+            IndentKind::Tab => "\t".into(),
+        }
+    }
 }
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct MarkdownParserConfig {}
 
 impl Default for MarkdownParserConfig {
     fn default() -> Self {
-        Self {
-            indent: IndentKind::Space { size: 4 },
-        }
+        Self {}
     }
 }
 
@@ -67,7 +72,21 @@ fn paragraph(input: Span) -> IResult<Paragraph> {
 }
 
 fn list(input: Span) -> IResult<List> {
-    map(many1(list_item), |children| List::new(children))(input)
+    // NOTE: decide indent type by checking a first item since indent type is different even in an one document.
+    // input.extra.indent = None;
+    // let (input, item) = list_item(input)?;
+    // dbg!(&input.extra);
+    // let (mut input, mut items) = many0(list_item)(input)?;
+    // input.extra.indent = None;
+
+    // let mut children = vec![];
+    // children.push(item);
+    // children.append(&mut items);
+
+    // Ok((input, List::new(children)))
+    let (mut input, list) = map(many1(list_item), |children| List::new(children))(input)?;
+    input.extra.indent = None; // reset
+    Ok((input, list))
 }
 
 fn node(input: Span) -> IResult<Node> {
@@ -232,13 +251,29 @@ fn table(input: Span) -> IResult<Table> {
 }
 
 fn list_item(input: Span) -> IResult<ListItem> {
-    let indent = match input.extra.config.indent {
-        IndentKind::Tab => "\t".into(),
-        IndentKind::Space { size } => " ".repeat(size),
-    };
+    let indent = input.extra.indent;
 
-    let (input, tabs) = many0(tag(indent.as_str()))(input)?;
-    let level = tabs.len();
+    let (input, level) = if let Some(indent) = indent.as_ref() {
+        let (input, tabs) = many0(tag(indent.to_string().as_str()))(input)?;
+        (input, tabs.len())
+    } else {
+        let (mut input, tabs) = take_while(|c| c == ' ' || c == '\t')(input)?;
+
+        // measure indent type by a first level 1 item
+        if tabs.is_empty() {
+            (input, 0)
+        } else {
+            let kind = match tabs.chars().next() {
+                Some('\t') => IndentKind::Tab,
+                Some(' ') => IndentKind::Space { size: tabs.len() },
+                _ => {
+                    unreachable!();
+                }
+            };
+            input.extra.indent = Some(kind);
+            (input, 1)
+        }
+    };
 
     fn decimal(input: Span) -> IResult<(ListKind, Vec<Node>)> {
         let (input, _) = terminated(digit1, tag(". "))(input)?;
@@ -265,18 +300,16 @@ mod test {
     use indoc::indoc;
     use rstest::rstest;
 
-    #[rstest(input, indent, expected,
-        case("    * 123abc\n", IndentKind::Space { size: 2}, ("", List::new(vec![ListItem::new(ListKind::Disc, 2, vec![Node::new(NodeKind::Text(Text::new("123abc")))])]))),
-        case("* 123abc\n", IndentKind::Space { size: 2}, ("", List::new(vec![ListItem::new(ListKind::Disc, 0, vec![Node::new(NodeKind::Text(Text::new("123abc")))])]))),
-        case("  123. abc\n", IndentKind::Space { size: 2}, ("", List::new(vec![ListItem::new(ListKind::Decimal, 1, vec![Node::new(NodeKind::Text(Text::new("abc")))])]))),
-        case("    * 123abc\n", IndentKind::Space { size: 4}, ("", List::new(vec![ListItem::new(ListKind::Disc, 1, vec![Node::new(NodeKind::Text(Text::new("123abc")))])]))),
-        case("        * 123abc\n", IndentKind::Space { size: 4}, ("", List::new(vec![ListItem::new(ListKind::Disc, 2, vec![Node::new(NodeKind::Text(Text::new("123abc")))])]))),
-        case("\t\t* 123abc\n", IndentKind::Tab, ("", List::new(vec![ListItem::new(ListKind::Disc, 2, vec![Node::new(NodeKind::Text(Text::new("123abc")))])]))),
+    #[rstest(input, expected,
+        case("* 123abc\n  * 123abc\n    * 123abc\n", ("", List::new(vec![ListItem::new(ListKind::Disc, 0, vec![Node::new(NodeKind::Text(Text::new("123abc")))]), ListItem::new(ListKind::Disc, 1, vec![Node::new(NodeKind::Text(Text::new("123abc")))]), ListItem::new(ListKind::Disc, 2, vec![Node::new(NodeKind::Text(Text::new("123abc")))])]))),
+        case("* 123abc\n    * 123abc\n        * 123abc\n", ("", List::new(vec![ListItem::new(ListKind::Disc, 0, vec![Node::new(NodeKind::Text(Text::new("123abc")))]), ListItem::new(ListKind::Disc, 1, vec![Node::new(NodeKind::Text(Text::new("123abc")))]), ListItem::new(ListKind::Disc, 2, vec![Node::new(NodeKind::Text(Text::new("123abc")))])]))),
+        case("123. abc\n",("", List::new(vec![ListItem::new(ListKind::Decimal, 0, vec![Node::new(NodeKind::Text(Text::new("abc")))])]))),
+        case("* 123abc\n123. abc\n",("", List::new(vec![ListItem::new(ListKind::Disc, 0, vec![Node::new(NodeKind::Text(Text::new("123abc")))]), ListItem::new(ListKind::Decimal, 0, vec![Node::new(NodeKind::Text(Text::new("abc")))])]))),
+        case("* 123abc\n\t* 123abc\n", ("", List::new(vec![ListItem::new(ListKind::Disc, 0, vec![Node::new(NodeKind::Text(Text::new("123abc")))]), ListItem::new(ListKind::Disc, 1, vec![Node::new(NodeKind::Text(Text::new("123abc")))])]))),
     )]
-    fn list_valid_test(input: &str, indent: IndentKind, expected: (&str, List)) {
-        let config = MarkdownParserConfig { indent };
+    fn list_valid_test(input: &str, expected: (&str, List)) {
         assert_eq!(
-            list(Span::new_extra(input, MarkdownParserContext { config }))
+            list(Span::new_extra(input, MarkdownParserContext::default()))
                 .map(|(input, ret)| (*input, ret)),
             Ok(expected)
         );
