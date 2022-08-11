@@ -12,7 +12,7 @@ use crate::ast::*;
 use super::*;
 
 pub fn take_until_eol<X: Clone>(input: Span<X>) -> IResult<Span<X>, X> {
-    alt((take_until("\n"), take(input.len())))(input)
+    alt((take_until("\n"), take(input.chars().count())))(input)
 }
 
 // [abc]

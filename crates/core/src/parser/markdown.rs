@@ -319,6 +319,7 @@ mod test {
 
     #[rstest(input, expected,
         case("# heading", ("", Heading::new("heading", 1))),
+        case("# ヘッダ", ("", Heading::new("ヘッダ", 1))),
         case("## heading", ("", Heading::new("heading", 2))),
     )]
     fn heading_valid_test(input: &str, expected: (&str, Heading)) {
