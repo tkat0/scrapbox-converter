@@ -3,7 +3,7 @@ use nom::{
     bytes::complete::{tag, take, take_until, take_while, take_while1},
     character::complete::char,
     combinator::{map, opt, peek},
-    sequence::{delimited, preceded},
+    sequence::{delimited, preceded, terminated},
     Err, Slice,
 };
 
@@ -120,10 +120,22 @@ pub fn text<X: Clone + Copy>(input: Span<X>) -> IResult<Text, X> {
 
 /// `block_quate`
 pub fn block_quate<X: Clone>(input: Span<X>) -> IResult<BlockQuate, X> {
-    map(
-        delimited(char('`'), take_while(|c| c != '`'), char('`')),
-        |s: Span<X>| BlockQuate::new(*s),
-    )(input)
+    let (input, _) = tag("`")(input)?;
+
+    // take until ` except \`
+    let mut count: usize = 0;
+    let mut is_esc = false;
+    for c in input.chars() {
+        if !is_esc && c == '`' {
+            break;
+        }
+        count += 1;
+        is_esc = c == '\\';
+    }
+
+    map(terminated(take(count), tag("`")), |s: Span<X>| {
+        BlockQuate::new(*s)
+    })(input)
 }
 
 pub fn space0<X: Clone>(input: Span<X>) -> IResult<Span<X>, X> {
@@ -241,6 +253,9 @@ mod test {
     #[rstest(input, expected,
         case("`code`", ("", BlockQuate::new("code"))),
         case("`code` test", (" test", BlockQuate::new("code"))),
+        case("``", ("", BlockQuate::new(""))),
+        case("`あいうえお`", ("", BlockQuate::new("あいうえお"))),
+        case("`\\``", ("", BlockQuate::new("\\`"))),
     )]
     fn block_quate_valid_test(input: &str, expected: (&str, BlockQuate)) {
         assert_eq!(
