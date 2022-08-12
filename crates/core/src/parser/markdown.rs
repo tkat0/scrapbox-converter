@@ -100,8 +100,8 @@ fn node(input: Span) -> IResult<Node> {
         map(external_link, |c| Node::new(NodeKind::ExternalLink(c))),
         map(math, |c| Node::new(NodeKind::Math(c))),
         // NOTE(tkat0): keep internal_link at the bottom of parsing bracket node
-        map(image_internal_link, |c| Node::new(NodeKind::Image(c))),
-        map(internal_link, |c| Node::new(NodeKind::InternalLink(c))),
+        previewable_wikilink,
+        map(wikilink, |c| Node::new(NodeKind::InternalLink(c))),
         map(external_link_plain, |s| {
             Node::new(NodeKind::ExternalLink(s))
         }),
@@ -109,8 +109,8 @@ fn node(input: Span) -> IResult<Node> {
     ))(input)
 }
 
-// [[internal link]]
-fn internal_link(input: Span) -> IResult<InternalLink> {
+// [[wikilink]]
+fn wikilink(input: Span) -> IResult<InternalLink> {
     map(
         delimited(tag("[["), take_while(|c| c != ']'), tag("]]")),
         |s: Span| InternalLink::new(*s),
@@ -125,21 +125,22 @@ fn external_link(input: Span) -> IResult<ExternalLink> {
     Ok((input, ExternalLink::new(Some(*title), *url)))
 }
 
-/// Obsidian image internal link
+/// Obsidian previewable wiki link
 /// ![[test.png]]
-fn image_internal_link(input: Span) -> IResult<Image> {
+/// ![[internal link]]
+fn previewable_wikilink(input: Span) -> IResult<Node> {
     let (input, url) = delimited(tag("![["), take_while(|c| c != ']'), tag("]]"))(input)?;
 
     let ext = ["svg", "jpg", "jpeg", "png", "gif"];
     let is_image = |url: &str| ext.iter().any(|e| url.ends_with(e));
 
     if is_image(*url) {
-        return Ok((input, Image::new(*url)));
+        Ok((input, Node::new(NodeKind::Image(Image::new(*url)))))
     } else {
-        Err(Err::Error(ParseError::new(
+        Ok((
             input,
-            "URL is not image".into(),
-        )))
+            Node::new(NodeKind::InternalLink(InternalLink::new(*url))),
+        ))
     }
 }
 
@@ -382,18 +383,19 @@ mod test {
     )]
     fn internal_link_valid_test(input: &str, expected: (&str, InternalLink)) {
         assert_eq!(
-            internal_link(Span::new_extra(input, MarkdownParserContext::default()))
+            wikilink(Span::new_extra(input, MarkdownParserContext::default()))
                 .map(|(input, ret)| (*input, ret)),
             Ok(expected)
         );
     }
 
     #[rstest(input, expected,
-        case("![[test.png]]", ("", Image::new("test.png"))),
+        case("![[test.png]]", ("", Node::new(NodeKind::Image(Image::new("test.png"))))),
+        case("![[wikilink]]", ("", Node::new(NodeKind::InternalLink(InternalLink::new("wikilink"))))),
     )]
-    fn image_internal_link_valid_test(input: &str, expected: (&str, Image)) {
+    fn previewable_wikilink_valid_test(input: &str, expected: (&str, Node)) {
         assert_eq!(
-            image_internal_link(Span::new_extra(input, MarkdownParserContext::default()))
+            previewable_wikilink(Span::new_extra(input, MarkdownParserContext::default()))
                 .map(|(input, ret)| (*input, ret)),
             Ok(expected)
         );
