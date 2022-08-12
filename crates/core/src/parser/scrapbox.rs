@@ -51,10 +51,9 @@ fn node(input: Span) -> IResult<Node> {
         // parser for single line
         map(hashtag, |s| Node::new(NodeKind::HashTag(s))),
         map(block_quate, |s| Node::new(NodeKind::BlockQuate(s))),
-        map(image, |s| Node::new(NodeKind::Image(s))),
         map(emphasis, |c| Node::new(NodeKind::Emphasis(c))),
         map(bold, |c| Node::new(NodeKind::Emphasis(c))),
-        map(external_link, |c| Node::new(NodeKind::ExternalLink(c))),
+        external_link_or_image,
         map(math, |c| Node::new(NodeKind::Math(c))),
         map(external_link_other_project, |s| {
             Node::new(NodeKind::ExternalLink(s))
@@ -89,7 +88,10 @@ fn external_link_other_project(input: Span) -> IResult<ExternalLink> {
 }
 
 /// [https://www.rust-lang.org/] or [https://www.rust-lang.org/ Rust] or [Rust https://www.rust-lang.org/]
-fn external_link(input: Span) -> IResult<ExternalLink> {
+/// [http://cutedog.com https://i.gyazo.com/da78df293f9e83a74b5402411e2f2e01.png]
+/// [https://i.gyazo.com/da78df293f9e83a74b5402411e2f2e01.png http://cutedog.com]
+/// [https://i.gyazo.com/da78df293f9e83a74b5402411e2f2e01.png]
+fn external_link_or_image(input: Span) -> IResult<Node> {
     let (input, text) = brackets(input)?;
 
     // [https://www.rust-lang.org/ Rust] or [https://www.rust-lang.org/]
@@ -129,31 +131,20 @@ fn external_link(input: Span) -> IResult<ExternalLink> {
 
     let (rest, link) = alt((url_title, title_url))(text)?;
     assert!(rest.is_empty());
-    Ok((input, link))
-}
 
-/// [http://cutedog.com https://i.gyazo.com/da78df293f9e83a74b5402411e2f2e01.png]
-/// [https://i.gyazo.com/da78df293f9e83a74b5402411e2f2e01.png]
-fn image(input: Span) -> IResult<Image> {
     let ext = ["svg", "jpg", "jpeg", "png", "gif"];
-    let (input, text) = brackets(input)?;
-    let (text, url1) = url(text)?;
-
     let is_image = |url: &str| ext.iter().any(|e| url.ends_with(e));
-
-    if text.is_empty() && is_image(&url1) {
-        // [https://i.gyazo.com/da78df293f9e83a74b5402411e2f2e01.png]
-        return Ok((input, Image::new(&url1)));
-    }
-
-    let (text, _) = space1(text)?;
-
-    let (text, url2) = url(text)?;
-    if text.is_empty() && is_image(&url2) {
-        // [http://cutedog.com https://i.gyazo.com/da78df293f9e83a74b5402411e2f2e01.png]
-        return Ok((input, Image::new(&url2)));
+    dbg!(&link);
+    if is_image(&link.url) {
+        Ok((input, Node::new(NodeKind::Image(Image::new(&link.url)))))
+    } else if let Some(true) = link.title.as_ref().map(|t| is_image(t)) {
+        // workaround
+        Ok((
+            input,
+            Node::new(NodeKind::Image(Image::new(&link.title.unwrap()))),
+        ))
     } else {
-        Err(Err::Error(ParseError::new(input, "".into())))
+        Ok((input, Node::new(NodeKind::ExternalLink(link))))
     }
 }
 
@@ -389,13 +380,21 @@ mod test {
     #[rstest(input, expected,
         case("[https://www.rust-lang.org/static/images/rust-logo-blk.svg]", ("", Image::new("https://www.rust-lang.org/static/images/rust-logo-blk.svg"))),
         // TODO(tkat0): enable link
+        case("[https://www.rust-lang.org/static/images/rust-logo-blk.svg https://www.rust-lang.org/]", ("", Image::new("https://www.rust-lang.org/static/images/rust-logo-blk.svg"))),
         case("[https://www.rust-lang.org/ https://www.rust-lang.org/static/images/rust-logo-blk.svg]", ("", Image::new("https://www.rust-lang.org/static/images/rust-logo-blk.svg"))),
         case("[https://www.rust-lang.org/　https://www.rust-lang.org/static/images/rust-logo-blk.svg]", ("", Image::new("https://www.rust-lang.org/static/images/rust-logo-blk.svg"))),
     )]
     fn image_valid_test(input: &str, expected: (&str, Image)) {
         assert_eq!(
-            image(Span::new_extra(input, ScrapboxParserContext::default()))
-                .map(|(input, ret)| (*input, ret)),
+            external_link_or_image(Span::new_extra(input, ScrapboxParserContext::default())).map(
+                |(input, ret)| {
+                    if let NodeKind::Image(image) = ret.kind {
+                        (*input, image)
+                    } else {
+                        panic!();
+                    }
+                }
+            ),
             Ok(expected)
         );
     }
@@ -468,8 +467,15 @@ mod test {
     )]
     fn external_link_valid_test(input: &str, expected: (&str, ExternalLink)) {
         assert_eq!(
-            external_link(Span::new_extra(input, ScrapboxParserContext::default()))
-                .map(|(input, ret)| (*input, ret)),
+            external_link_or_image(Span::new_extra(input, ScrapboxParserContext::default())).map(
+                |(input, ret)| {
+                    if let NodeKind::ExternalLink(link) = ret.kind {
+                        (*input, link)
+                    } else {
+                        panic!();
+                    }
+                }
+            ),
             Ok(expected)
         );
     }
