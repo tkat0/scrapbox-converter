@@ -14,6 +14,11 @@ pub enum TransformCommand {
 }
 
 pub trait Visitor: Sized {
+    /// if returns true, visitor doesn't walk nodes
+    fn is_finish(&mut self) -> bool {
+        false
+    }
+
     fn visit(&mut self, value: &mut Page) {
         self.visit_page(value);
     }
@@ -79,13 +84,19 @@ pub trait Visitor: Sized {
     }
 }
 
-fn walk_page<V: Visitor>(visitor: &mut V, value: &mut Page) {
+pub fn walk_page<V: Visitor>(visitor: &mut V, value: &mut Page) {
     for node in value.nodes.iter_mut() {
+        if visitor.is_finish() {
+            return;
+        }
         visitor.visit_node(node);
     }
 }
 
-fn walk_node<V: Visitor>(visitor: &mut V, value: &mut Node) {
+pub fn walk_node<V: Visitor>(visitor: &mut V, value: &mut Node) {
+    if visitor.is_finish() {
+        return;
+    }
     let command = match value.kind.borrow_mut() {
         NodeKind::Paragraph(v) => visitor.visit_paragraph(v),
         NodeKind::List(v) => visitor.visit_list(v),
@@ -114,8 +125,14 @@ fn walk_node<V: Visitor>(visitor: &mut V, value: &mut Node) {
     }
 }
 
-fn walk_paragraph<V: Visitor>(visitor: &mut V, value: &mut Paragraph) -> Option<TransformCommand> {
+pub fn walk_paragraph<V: Visitor>(
+    visitor: &mut V,
+    value: &mut Paragraph,
+) -> Option<TransformCommand> {
     for node in value.children.iter_mut() {
+        if visitor.is_finish() {
+            return None;
+        }
         visitor.visit_node(node);
     }
     None
