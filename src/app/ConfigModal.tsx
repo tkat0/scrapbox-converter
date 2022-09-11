@@ -1,4 +1,4 @@
-import { Config, IndentKind } from "@@/scrapbox_converter_demo";
+import { Config } from "@@/scrapbox_converter_demo";
 import {
   Box,
   Button,
